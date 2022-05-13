@@ -3,6 +3,9 @@ uuid = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
 authors = ["Knut Andreas Meyer and contributors"]
 version = "0.1.0"
 
+[deps]
+Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
+
 [compat]
 julia = "1"
 

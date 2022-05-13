@@ -4,13 +4,13 @@ using Documenter
 DocMeta.setdocmeta!(MaterialModelsInterface, :DocTestSetup, :(using MaterialModelsInterface); recursive=true)
 
 makedocs(;
-    modules=[MaterialModelsInterface],
+    modules=[MaterialModelsBase],
     authors="Knut Andreas Meyer and contributors",
-    repo="https://github.com/KnutAM/MaterialModelsInterface.jl/blob/{commit}{path}#{line}",
-    sitename="MaterialModelsInterface.jl",
+    repo="https://github.com/KnutAM/MaterialModelsBase.jl/blob/{commit}{path}#{line}",
+    sitename="MaterialModelsBase.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://KnutAM.github.io/MaterialModelsInterface.jl",
+        canonical="https://KnutAM.github.io/MaterialModelsBase.jl",
         assets=String[],
     ),
     pages=[
@@ -19,6 +19,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/KnutAM/MaterialModelsInterface.jl",
+    repo="github.com/KnutAM/MaterialModelsBase.jl",
     devbranch="main",
 )

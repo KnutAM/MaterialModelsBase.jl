@@ -1,6 +1,6 @@
-using MaterialModelsInterface
+using MaterialModelsBase
 using Test
 
-@testset "MaterialModelsInterface.jl" begin
+@testset "MaterialModelsBase.jl" begin
     # Write your tests here.
 end

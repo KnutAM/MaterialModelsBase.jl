@@ -1,3 +1,3 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-MaterialModelsInterface = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
+MaterialModelsBase = "af893363-701d-44dc-8b1e-d9a2c129bfc9"

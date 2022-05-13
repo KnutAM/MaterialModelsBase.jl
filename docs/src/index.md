@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = MaterialModelsInterface
+CurrentModule = MaterialModelsBase
 ```
 
-# MaterialModelsInterface
+# MaterialModelsBase
 
-Documentation for [MaterialModelsInterface](https://github.com/KnutAM/MaterialModelsInterface.jl).
+Documentation for [MaterialModelsBase](https://github.com/KnutAM/MaterialModelsBase.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [MaterialModelsInterface]
+Modules = [MaterialModelsBase]
 ```

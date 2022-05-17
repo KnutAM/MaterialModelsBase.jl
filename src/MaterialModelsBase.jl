@@ -10,7 +10,7 @@ export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    # Ex
 
 export MaterialDerivatives, differentiate_material!                         # Differentiation routines
 export allocate_differentiation_output
-export getnumtensorcomponents, getnumstatevars, getnumparam
+export getnumtensorcomponents, getnumstatevars, getnumparams
 export material2vector, material2vector!, vector2material                   # Conversion routines
 
 abstract type AbstractMaterial end

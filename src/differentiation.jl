@@ -102,4 +102,4 @@ allocate_differentiation_output(::AbstractMaterial) = NoExtraOutput()
 
 Calculate the derivatives and save them in `diff`. 
 """
-differentiate_material!(diff::MaterialDerivatives, m::AbstractMaterial, ϵ, old, Δt, dσdϵ, extra::AbstractExtraOutput)
+function differentiate_material! end

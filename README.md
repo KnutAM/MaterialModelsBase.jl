@@ -1,11 +1,12 @@
 # MaterialModelsBase
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://KnutAM.github.io/MaterialModelsBase.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://KnutAM.github.io/MaterialModelsBase.jl/dev)
 [![Build Status](https://github.com/KnutAM/MaterialModelsBase.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/KnutAM/MaterialModelsBase.jl/actions/workflows/CI.yml?query=branch%3Amain)
+<!---
 [![Coverage](https://codecov.io/gh/KnutAM/MaterialModelsBase.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/KnutAM/MaterialModelsBase.jl)
+-->
 
-Provide a implementation indifferent interface to "standard" history dependent mechanical (stress-strain) material models.
+Provide interface to "standard" history dependent mechanical (stress-strain) material models that is implementation indifferent.
 
 ## Main interface function
 ```julia

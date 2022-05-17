@@ -16,7 +16,7 @@ material_response(
     old::AbstractMaterialState,                     # The old material state
     Δt,                                             # The time step
     cache::AbstractMaterialCache,                   # A cache that can be used to reduce allocations inside material_response
-    extras::AbstractExtraOutput;                    # Custom struct whose entries can be muted to provide extra information from material_response's calculations
+    extras::AbstractExtraOutput;                    # Custom struct whose entries can be mutated to provide extra information from material_response's calculations
     options)                                        # Additional options if desired. 
 ```
 

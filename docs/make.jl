@@ -1,7 +1,7 @@
-using MaterialModelsInterface
+using MaterialModelsBase
 using Documenter
 
-DocMeta.setdocmeta!(MaterialModelsInterface, :DocTestSetup, :(using MaterialModelsInterface); recursive=true)
+DocMeta.setdocmeta!(MaterialModelsBase, :DocTestSetup, :(using MaterialModelsBase); recursive=true)
 
 makedocs(;
     modules=[MaterialModelsBase],

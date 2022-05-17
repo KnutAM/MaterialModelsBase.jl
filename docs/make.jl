@@ -15,6 +15,7 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Differentiation" => "differentiation.md"
     ],
 )
 

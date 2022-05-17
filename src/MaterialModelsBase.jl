@@ -2,13 +2,16 @@ module MaterialModelsBase
 using Tensors
 
 export material_response, initial_material_state, get_cache                 # Main (mandatory) functions
-#export MaterialDerivatives, differentiate_material!                         # Differentiation routines
-#export material2vector, material2vector!, vector2material                   # Conversion routines
 export AbstractMaterial                                                     # Material parameters
 export AbstractMaterialState, NoMaterialState                               # State
 export AbstractMaterialCache, NoMaterialCache                               # Cache
 export AbstractExtraOutput, NoExtraOutput                                   # Extra output
 export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    # Exceptions
+
+export MaterialDerivatives, differentiate_material!                         # Differentiation routines
+export allocate_differentiation_output
+export getnumtensorcomponents, getnumstatevars, getnumparam
+export material2vector, material2vector!, vector2material                   # Conversion routines
 
 abstract type AbstractMaterial end
 
@@ -59,9 +62,12 @@ function material_response end
 
 # Initial material state
 """
-    get_initial_state(m::AbstractMaterial)
+    initial_material_state(m::AbstractMaterial)
 
-Return the (default) initial state of the material `m`
+Return the (default) initial `state::AbstractMaterialState` 
+of the material `m`. 
+
+Defaults to the empty `NoMaterialState()`
 """
 function initial_material_state(::AbstractMaterial) 
     return NoMaterialState()
@@ -74,8 +80,10 @@ struct NoMaterialState <: AbstractMaterialState end
 """
     get_cache(m::AbstractMaterial)
 
-Return a cache that can be used when calling the material to reduce allocations
-TODO: Rename to `allocate_cache`?
+Return a `cache::AbstractMaterialCache` that can be used when 
+calling the material to reduce allocations
+
+Defaults to the empty `NoMaterialCache()`
 """
 function get_cache(::AbstractMaterial) 
     return NoMaterialCache()
@@ -85,8 +93,21 @@ abstract type AbstractMaterialCache end
 struct NoMaterialCache <: AbstractMaterialCache end
 
 # Extra output
+"""
+    AbstractExtraOutput()
+
+By allocating an `AbstractExtraOutput` type, this type can be mutated
+to extract additional information from the internal calculations 
+in `material_response` only in cases when this is desired. 
+E.g., when calculating derivatives. 
+The concrete `NoExtraOutput<:AbstractExtraOutput` exists for the case
+when no additional output should be calculated. 
+"""
 abstract type AbstractExtraOutput end
+
 struct NoExtraOutput <: AbstractExtraOutput end
+
+include("differentiation.jl")
 
 # Convergence errors
 abstract type MaterialConvergenceError <: Exception end

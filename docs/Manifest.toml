@@ -168,7 +168,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[deps.MaterialModelsBase]]
 deps = ["Tensors"]
-git-tree-sha1 = "ac8dc77324388f773a1e64a486999c6b1dff1828"
+path = ".."
 uuid = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
 version = "0.1.0"
 

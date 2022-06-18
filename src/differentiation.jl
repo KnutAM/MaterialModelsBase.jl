@@ -98,7 +98,8 @@ allocate_differentiation_output(::AbstractMaterial) = NoExtraOutput()
         diff::MaterialDerivatives, m::AbstractMaterial, 
         ϵ::Union{SecondOrderTensor, Vec}, 
         old::AbstractMaterialState, Δt, 
-        dσdϵ::AbstractTensor, extra::AbstractExtraOutput)
+        dσdϵ::AbstractTensor, extra::AbstractExtraOutput,
+        cache::AbstractMaterialCache)
 
 Calculate the derivatives and save them in `diff`. 
 """

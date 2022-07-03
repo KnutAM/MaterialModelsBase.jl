@@ -1,6 +1,10 @@
 using MaterialModelsBase
 using Test
+using Tensors, StaticArrays
 
-@testset "MaterialModelsBase.jl" begin
-    # Write your tests here.
-end
+const MMB = MaterialModelsBase
+
+include("TestMaterials.jl")
+using .TestMaterials
+
+include("stressiterations.jl")

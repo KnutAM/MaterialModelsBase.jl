@@ -1,6 +1,7 @@
 module MaterialModelsBase
-using Tensors
+using Tensors, StaticArrays
 
+# Standard for all materials
 export material_response, initial_material_state, get_cache                 # Main (mandatory) functions
 export AbstractMaterial                                                     # Material parameters
 export AbstractMaterialState, NoMaterialState                               # State
@@ -8,55 +9,76 @@ export AbstractMaterialCache, NoMaterialCache                               # Ca
 export AbstractExtraOutput, NoExtraOutput                                   # Extra output
 export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    # Exceptions
 
+# Stress state iterations
+export AbstractStressState
+export FullStressState, PlaneStrain, UniaxialStrain         # Non-iteration stress states
+export PlaneStress, UniaxialStress, UniaxialNormalStress    # Iterative stress state (unless overloaded)
+
+# For parameter identification and differentiation of materials
+export material2vector, material2vector!, vector2material                   # Convert to/from parameter vector
+export getnumtensorcomponents, getnumstatevars, getnumparams                # Information about the specific material 
 export MaterialDerivatives, differentiate_material!                         # Differentiation routines
 export allocate_differentiation_output
-export getnumtensorcomponents, getnumstatevars, getnumparams
-export material2vector, material2vector!, vector2material                   # Conversion routines
+
+
 
 abstract type AbstractMaterial end
 
-# Main material response routine
 """
-    material_response(m::AbstractMaterial, ϵ::SymmetricTensor{2}, old::AbstractMaterialState, Δt, cache::AbstractMaterialCache, extras::AbstractExtraOutput; options)
+    material_response(
+        [stress_state::AbstractStressState],
+        m::AbstractMaterial, 
+        strain::Union{SecondOrderTensor,Vec}, 
+        old::AbstractMaterialState, 
+        Δt::Union{Number,Nothing}=nothing, 
+        cache::AbstractMaterialCache=get_cache(m), 
+        extras::AbstractExtraOutput=NoExtraOutput(); 
+        options::Dict=Dict{Symbol}()
+        )
 
-    material_response(m::AbstractMaterial, F::Tensor{2}, old::AbstractMaterialState, Δt, cache::AbstractMaterialCache, extras::AbstractExtraOutput; options)
-
-    material_response(m::AbstractMaterial, u::Vec, old::AbstractMaterialState, Δt, cache::AbstractMaterialCache, extras::AbstractExtraOutput; options)
-
-Calculate the stress/traction, stiffness and updated state variables for the material `m`, given the strain input `ϵ`, the deformation gradient `F`, or the deformation vector `u`
+Calculate the stress/traction, stiffness and updated state variables 
+for the material `m`, given the strain input `strain`.
 
 # Mandatory arguments
 - `m`: Defines the material and its parameters
-- The second input can be one of
+- The second `strain` input can be, e.g.
     - `ϵ::SymmetricTensor{2}`: The total small strain tensor at the end of the increment
     - `F::Tensor{2}`: The total deformation gradient at the end of the increment
     - `u::Vec`: The deformation at the end of the increment (for cohesive elements)
-- `old::AbstractMaterialState`: The material state variables at the end of the last converged increment
-    The material initial material state can be obtained by the [`initial_material_state`](@ref) function.
+- `old::AbstractMaterialState`: The material state variables at the end of the last 
+   converged increment. The material initial material state can be obtained by 
+   the [`initial_material_state`](@ref) function.
 
 # Optional positional arguments
-- `Δt`: The time step in the current increment. The default may depend on the material. 
-- `cache::AbstractMaterialCache`: Cache variables that can be used to avoid allocations during each call to the `material_response` function
-    This can be created by the [`get_cache`](@ref) function.
-- `extras`: Updated with requested extra output. Defaults to the empty struct `NoExtraOutput`
+- `stress_state`: Use to solve for a reduced stress state, e.g. PlaneStress. 
+   See [Stress states](@ref).
+- `Δt`: The time step in the current increment. Defaults to `nothing`. 
+- `cache::AbstractMaterialCache`: Cache variables that can be used to avoid
+  allocations during each call to the `material_response` function. 
+  This can be created by the [`get_cache`](@ref) function.
+- `extras`: Updated with requested extra output. 
+  Defaults to the empty struct `NoExtraOutput`
 
 # Optional keyword arguments
-- `options`: Additional options that may be specific for each material. Defaults to `nothing`
+- `options`: Additional options that may be specific for each material. 
+  This is also used for stress iterations, see [Stress states](@ref).
 
-# Output
+# Outputs
+1) `stress`, is the stress measure that is energy conjugated to the `strain` (2nd) input.
+2) `stiffness`, is the derivative of the `stress` output wrt. the `strain` input. 
+3) `new_state`, are the updated state variables
+4) `strain`, is only available if `stress_state` is given and returns the full strain tensor
+
+The following are probably the three most common `strain` and `stress` pairs:
 - If the second input is the deformation gradient ``\\boldsymbol{F}`` (`F::Tensor{2}`)`, the outputs are
     - `P::Tensor{2}`: First Piola-Kirchhoff stress, ``\\boldsymbol{P}``
     - `dPdF::Tensor{4}`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{P}/\\mathrm{d}\\boldsymbol{F}``
-    - `state::AbstractMaterialState`: The updated material state variables at the end of the time increment
 - If the second input is the small strain tensor, ``\\boldsymbol{\\epsilon}`` (`ϵ::SymmetricTensor{2}`), the outputs are
     - `σ::SymmetricTensor{2}`: Cauchy stress tensor, ``\\boldsymbol{\\sigma}``
     - `dσdϵ::SymmetricTensor{4}`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{\\sigma}/\\mathrm{d}\\boldsymbol{\\epsilon}``
-    - `state::AbstractMaterialState`: The updated material state variables at the end of the time increment
 - If the second input is deformation vector, ``\\boldsymbol{u}`` (`u::Vec`), the outputs are
     - `t::Vec`: Traction vector, ``\\boldsymbol{t}``
     - `dtdu::SecondOrderTensor`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{t}/\\mathrm{d}\\boldsymbol{u}``
-    - `state::AbstractMaterialState`: The updated material state variables at the end of the time increment
-
 """
 function material_response end
 
@@ -99,7 +121,7 @@ struct NoMaterialCache <: AbstractMaterialCache end
 By allocating an `AbstractExtraOutput` type, this type can be mutated
 to extract additional information from the internal calculations 
 in `material_response` only in cases when this is desired. 
-E.g., when calculating derivatives. 
+E.g., when calculating derivatives or for multiphysics simulations.
 The concrete `NoExtraOutput<:AbstractExtraOutput` exists for the case
 when no additional output should be calculated. 
 """
@@ -108,8 +130,14 @@ abstract type AbstractExtraOutput end
 struct NoExtraOutput <: AbstractExtraOutput end
 
 include("differentiation.jl")
+include("stressiterations.jl")
 
 # Convergence errors
+"""
+    MaterialConvergenceError
+
+Can be used to catch errors related to the material not converging. 
+"""
 abstract type MaterialConvergenceError <: Exception end
 Base.showerror(io::IO, e::MaterialConvergenceError) = println(io, e.msg)
 
@@ -125,7 +153,7 @@ end
 """
     NoStressConvergence(msg::String)
 
-Throw if the stress iterations don't converge
+This is thrown if the stress iterations don't converge, see [Stress states](@ref)
 """
 struct NoStressConvergence <: MaterialConvergenceError
     msg::String

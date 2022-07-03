@@ -100,15 +100,12 @@ function material_response(
     stress_state::NoIterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,
-    old::AbstractMaterialState,
-    Δt=nothing,
-    cache::AbstractMaterialCache=get_cache(m),
-    extras::AbstractExtraOutput=NoExtraOutput();
+    args...;
     options::Dict=Dict{Symbol,Any}(),
     )
 
     ϵ_full = get_full_tensor(stress_state, ϵ)
-    σ, dσdϵ, new_state = material_response(m, ϵ_full, old, Δt, cache, extras; options=options)
+    σ, dσdϵ, new_state = material_response(m, ϵ_full, args...; options=options)
     return reduce_tensordim(stress_state, σ), reduce_tensordim(stress_state, dσdϵ), new_state, ϵ_full
 end
 
@@ -116,10 +113,7 @@ function material_response(
     stress_state::IterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,
-    old::AbstractMaterialState,
-    Δt=nothing,
-    cache::AbstractMaterialCache=get_cache(m),
-    extras::AbstractExtraOutput=NoExtraOutput();
+    args...;
     options::Dict=Dict{Symbol,Any}(),
     )
 
@@ -130,7 +124,7 @@ function material_response(
     ϵ_full = get_full_tensor(stress_state, ϵ)
 
     for _ in 1:maxiter
-        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, old, Δt, cache, extras; options=options)
+        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...; options=options)
         σ_mandel = get_unknowns(stress_state, σ_full)
         if norm(σ_mandel) < tol
             dσdϵ = reduce_stiffness(stress_state, dσdϵ_full)

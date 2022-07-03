@@ -11,6 +11,22 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
                 ([3,4,5,7,8], [3,4,5]),
                 ([2,3], [2,3]))
 
+tensortype(::SymmetricTensor) = SymmetricTensor
+tensortype(::Tensor) = Tensor
+function run_timehistory(s::MMB.AbstractStressState, m::AbstractMaterial, ϵv::Vector{<:AbstractTensor}, t = collect(range(0,1,length(ϵ))))
+    state = initial_material_state(m)
+    cache = get_cache(m)
+    σv = eltype(ϵv)[]
+    ϵv_full = tensortype(first(ϵv))[]
+    local dσdϵ
+    for i in 2:length(ϵv)
+        σ, dσdϵ, state, ϵ_full = material_response(s, m, ϵv[i], state, t[i]-t[i-1], cache)
+        push!(σv, σ)
+        push!(ϵv_full, ϵ_full)
+    end
+    return σv, ϵv_full, dσdϵ
+end
+
 @testset "conversions" begin
     # Test that
     # 1) All conversions are invertible (convert back and fourth)
@@ -104,30 +120,22 @@ end
     @test σ_full[1:2,1:2] ≈ σ 
 end
 
-@testset "regression" begin
-    # Test by running stress iterations for each case
-    # Ensure that 
-    # 1) The output types are as expected
-    # 2) Specific materials: the expected stiffness is returned
-    # 3) All materials: calling the material again produces the 
-    #    expected stress components to be zero
-    # 4) All materials, that the derivative wrt. iterations are correct, 
-    #    compared to numerical derivatives
+@testset "visco_elastic" begin
+    # Test a nonlinear, state and rate dependent, material by running stress iterations.
+    # Check that state variables and time dependence are handled correctly
+    G = 80.e3           # Shear modulus (μ)
+    K = 160.e3          # Bulk modulus
+    E = 9*K*G/(3*K+G)   # Young's modulus
+    material = ViscoElastic(LinearElastic(G, K), LinearElastic(G*0.5, K*0.5), E*0.1)
+    
+    stress_state = UniaxialStress()
+    N = 100
+    ϵ_end = 0.1
+    ϵv = collect((SymmetricTensor{2,1}((ϵ_end*(i-1)/N,)) for i in 1:N+1))
+    tfast, tslow = (1.e-10, 1.e+10)
+    σvf, ϵv_fullf, dσdϵf = run_timehistory(stress_state, material, ϵv, collect(range(0,tfast, N+1)))
+    σvs, ϵv_fulls, dσdϵs = run_timehistory(stress_state, material, ϵv, collect(range(0,tslow, N+1)))
+    @test dσdϵf[1,1,1,1] ≈ 1.5E # Fast limit response
+    @test dσdϵs[1,1,1,1] ≈ 1.0E # Slow limit response
 end
 
-#=
-tensortype(::SymmetricTensor) = SymmetricTensor
-tensortype(::Tensor) = Tensor
-function run_timehistory(m::AbstractMaterial, s::MMB.AbstractStressState, ϵ::Vector{<:AbstractTensor}, t = collect(range(0,1,length(ϵ))))
-    state = initial_material_state(m)
-    cache = get_cache(m)
-    σv = eltype(ϵv)[]
-    ϵv_full = tensortype(first(ϵv))[]
-    for i in 2:length(ϵ)
-        σ, dσdϵ, state, ϵ_full = material_response(s, m, ϵv[i], state, t[i]-t[i-1], cache)
-        push!(σv, σ)
-        push!(ϵv_full, ϵ_full)
-    end
-    return σv, ϵv_full
-end
-=#

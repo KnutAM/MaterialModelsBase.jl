@@ -51,7 +51,7 @@ function get_stress_ϵv(m::ViscoElastic, ϵ::SymmetricTensor{2,3}, old::ViscoEla
     E1 = get_stiffness(m.E1)
     E2 = get_stiffness(m.E2)
     ϵv = inv(Δt*E2+one(E2)*m.η)⊡(Δt*E2⊡ϵ + m.η*old.ϵv)
-    σ = E1⊡ϵ + η*(ϵv-old.ϵv)/Δt
+    σ = E1⊡ϵ + m.η*(ϵv-old.ϵv)/Δt
     return σ, ϵv
 end
 
@@ -64,7 +64,7 @@ function material_response(
     ::NoExtraOutput=NoExtraOutput(); 
     options::Dict=Dict{Symbol,Any}())
     σ, ϵv = get_stress_ϵv(m,ϵ,old,Δt)
-    dσdϵ = gradient(ϵ_->get_stress_ev(m,ϵ_,old,Δt)[1], ϵ)
+    dσdϵ = gradient(ϵ_->get_stress_ϵv(m,ϵ_,old,Δt)[1], ϵ)
     return σ, dσdϵ, ViscoElasticState(ϵv)
 end
 

@@ -13,7 +13,7 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
 
 tensortype(::SymmetricTensor) = SymmetricTensor
 tensortype(::Tensor) = Tensor
-function run_timehistory(s::MMB.AbstractStressState, m::AbstractMaterial, ϵv::Vector{<:AbstractTensor}, t = collect(range(0,1,length(ϵ))))
+function run_timehistory(s::MMB.AbstractStressState, m::AbstractMaterial, ϵv::Vector{<:AbstractTensor}, t = collect(range(0,1;length=length(ϵ))))
     state = initial_material_state(m)
     cache = get_cache(m)
     σv = eltype(ϵv)[]
@@ -133,8 +133,8 @@ end
     ϵ_end = 0.1
     ϵv = collect((SymmetricTensor{2,1}((ϵ_end*(i-1)/N,)) for i in 1:N+1))
     tfast, tslow = (1.e-10, 1.e+10)
-    σvf, ϵv_fullf, dσdϵf = run_timehistory(stress_state, material, ϵv, collect(range(0,tfast, N+1)))
-    σvs, ϵv_fulls, dσdϵs = run_timehistory(stress_state, material, ϵv, collect(range(0,tslow, N+1)))
+    σvf, ϵv_fullf, dσdϵf = run_timehistory(stress_state, material, ϵv, collect(range(0.,tfast; length=N+1)))
+    σvs, ϵv_fulls, dσdϵs = run_timehistory(stress_state, material, ϵv, collect(range(0.,tslow; length=N+1)))
     @test dσdϵf[1,1,1,1] ≈ 1.5E # Fast limit response
     @test dσdϵs[1,1,1,1] ≈ 1.0E # Slow limit response
 end

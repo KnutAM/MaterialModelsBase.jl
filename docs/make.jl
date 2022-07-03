@@ -15,6 +15,7 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Stress states" => "stressiterations.md",
         "Differentiation" => "differentiation.md"
     ],
 )

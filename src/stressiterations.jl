@@ -3,25 +3,69 @@
 abstract type AbstractStressState end
 
 # Cases without stress iterations
-# Requires 3d strain input, outputs 3d stress
+""" 
+    FullStressState()
+
+Return the full stress state, without any constraints. 
+Equivalent to not giving any stress state to the 
+`material_response` function, except that when given, 
+the full strain (given as input) is also an output which 
+can be useful if required for consistency with the other 
+stress states. 
+"""
 struct FullStressState <: AbstractStressState end
-# Requires at least 2d strain input, outputs 2d stress
+
+""" 
+    PlaneStrain()
+
+Plane strain such that if only 2d-components (11, 12, 21, and 22) are given,
+the remaining strain components are zero. The output is the reduced set, 
+with the mentioned components. It is possible to give non-zero values for the
+other strain components, and these will be used for the material evaluation. 
+"""
 struct PlaneStrain <: AbstractStressState end
-# Requires at least 1d strain input, outputs 1d stress
+
+""" 
+    UniaxialStrain()
+
+Uniaxial strain such that if only the 11-strain component is given,
+the remaining strain components are zero. The output is the reduced set, i.e. 
+only the 11-stress-component. It is possible to give non-zero values for the
+other strain components, and these will be used for the material evaluation. 
+"""
 struct UniaxialStrain <: AbstractStressState end
 
+""" 
+    UniaxialStress()
 
-# Cases with stress iterations
-# Only σ11 != 0
-# Requires at least 1d strain input, outputs 1d stress
+Uniaxial stress such that 
+``\\sigma_{ij}=0 \\forall (i,j)\\neq (1,1)``
+The strain input can be 1d (`SecondOrderTensor{1}`).
+A 3d input is also accepted and used as an initial 
+guess for the unknown strain components. 
+"""
 struct UniaxialStress <: AbstractStressState end
 
-# σ33=σ23=σ13=0
-# Requires at least 2d strain input, outputs 2d stress
+""" 
+    PlaneStress()
+
+Plane stress such that 
+``\\sigma_{33}=\\sigma_{23}=\\sigma_{13}=\\sigma_{32}=\\sigma_{31}=0``
+The strain input should be at least 2d (components 11, 12, 21, and 22).
+A 3d input is also accepted and used as an initial guess for the unknown 
+out-of-plane strain components. 
+"""
 struct PlaneStress <: AbstractStressState end
 
-# σ22=σ33=0
-# Requires a full strain input, outputs 3d stress
+""" 
+    UniaxialNormalStress()
+
+This is a variation of the uniaxial stress state, such that only
+``\\sigma_{22}=\\sigma_{33}=0``
+The strain input must be 3d, and the components 
+``\\epsilon_{22}`` and ``\\epsilon_{33}`` are used as initial guesses. 
+This case is useful when simulating strain-controlled axial-shear experiments
+"""
 struct UniaxialNormalStress <: AbstractStressState end
 
 const NoIterationState = Union{FullStressState,PlaneStrain,UniaxialStrain}

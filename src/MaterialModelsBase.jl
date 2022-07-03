@@ -31,8 +31,8 @@ abstract type AbstractMaterial end
         strain::Union{SecondOrderTensor,Vec}, 
         old::AbstractMaterialState, 
         Δt::Union{Number,Nothing}=nothing, 
-        cache::AbstractMaterialCache, 
-        extras::AbstractExtraOutput; 
+        cache::AbstractMaterialCache=get_cache(m), 
+        extras::AbstractExtraOutput=NoExtraOutput(); 
         options::Dict=Dict{Symbol}()
         )
 
@@ -51,7 +51,7 @@ for the material `m`, given the strain input `strain`.
 
 # Optional positional arguments
 - `stress_state`: Use to solve for a reduced stress state, e.g. PlaneStress. 
-   See [?]
+   See [Stress states](@ref).
 - `Δt`: The time step in the current increment. Defaults to `nothing`. 
 - `cache::AbstractMaterialCache`: Cache variables that can be used to avoid
   allocations during each call to the `material_response` function. 
@@ -61,7 +61,7 @@ for the material `m`, given the strain input `strain`.
 
 # Optional keyword arguments
 - `options`: Additional options that may be specific for each material. 
-  This is also used for stress iterations, see [?]
+  This is also used for stress iterations, see [Stress states](@ref).
 
 # Outputs
 1) `stress`, is the stress measure that is energy conjugated to the `strain` (2nd) input.
@@ -153,7 +153,7 @@ end
 """
     NoStressConvergence(msg::String)
 
-This is thrown if the stress iterations don't converge, see [?]
+This is thrown if the stress iterations don't converge, see [Stress states](@ref)
 """
 struct NoStressConvergence <: MaterialConvergenceError
     msg::String

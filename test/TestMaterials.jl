@@ -1,8 +1,7 @@
 module TestMaterials
 using MaterialModelsBase
 using Tensors, StaticArrays
-include(joinpath(@__DIR__, "Newton.jl"))
-using .Newton
+using Newton
 
 # Overloaded functions
 import MaterialModelsBase: material_response, initial_material_state, get_cache

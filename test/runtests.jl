@@ -1,6 +1,6 @@
 using MaterialModelsBase
 using Test
-using Tensors, StaticArrays, ForwardDiff
+using Tensors, StaticArrays
 
 const MMB = MaterialModelsBase
 

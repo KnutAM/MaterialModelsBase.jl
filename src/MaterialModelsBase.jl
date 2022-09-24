@@ -139,7 +139,8 @@ include("stressiterations.jl")
 Can be used to catch errors related to the material not converging. 
 """
 abstract type MaterialConvergenceError <: Exception end
-Base.showerror(io::IO, e::MaterialConvergenceError) = println(io, e.msg)
+#The following is only needed if additional formatting is desired:
+#Base.showerror(io::IO, e::MaterialConvergenceError) = println(io, e.msg)
 
 """
     NoLocalConvergence(msg::String)

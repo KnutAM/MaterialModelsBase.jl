@@ -27,7 +27,7 @@ that someone else have written, this is all that needs to be done.
 If we would write a material point simulator, we also need to instantiate the material state,
 and optionally the cache. 
 ```julia
-state = initial_material_cache(material)
+state = initial_material_state(material)
 cache = get_cache(material)
 ```
 

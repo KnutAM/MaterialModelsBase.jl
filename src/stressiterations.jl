@@ -95,8 +95,11 @@ reduce_tensordim(::Val{dim}, A::Tensor{4}) where dim = Tensor{4,dim}((i,j,k,l)->
 reduce_tensordim(::Val{dim}, a::SymmetricTensor{2}) where dim = SymmetricTensor{2,dim}((i,j)->a[i,j])
 reduce_tensordim(::Val{dim}, A::SymmetricTensor{4}) where dim = SymmetricTensor{4,dim}((i,j,k,l)->A[i,j,k,l])
 
+function material_response(stress_state::AbstractStressState, m::AbstractMaterial, args...; kwargs...)
+    return reduced_material_response(stress_state, m, args...; kwargs...)
+end
 
-function material_response(
+function reduced_material_response(
     stress_state::NoIterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,
@@ -109,7 +112,7 @@ function material_response(
     return reduce_tensordim(stress_state, σ), reduce_tensordim(stress_state, dσdϵ), new_state, ϵ_full
 end
 
-function material_response(
+function reduced_material_response(
     stress_state::IterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,

@@ -25,4 +25,5 @@ PlaneStress
 UniaxialStrain
 UniaxialStress
 UniaxialNormalStress
+GeneralStressState
 ```

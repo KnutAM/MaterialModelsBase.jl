@@ -3,16 +3,35 @@ _getdim(::MaterialModelsBase.State2D) = 2
 _getdim(::MaterialModelsBase.State3D) = 3
 _getdim(::AbstractTensor{order,dim}) where {order,dim} = dim
 
+tensortype(::SymmetricTensor) = SymmetricTensor
+tensortype(::Tensor) = Tensor
+
+# Create GeneralStressState from regular states to check compatibility
+function MMB.GeneralStressState(::UniaxialStress, TT::Type{<:SecondOrderTensor{3}})
+    σ = zero(TT)
+    σ_ctrl = tensortype(σ){2,3,Bool}((i,j)->!(i==j==1))
+    return MMB.GeneralStressState(σ_ctrl, σ)
+end
+function MMB.GeneralStressState(::PlaneStress, TT::Type{<:SecondOrderTensor{3}})
+    σ = zero(TT)
+    σ_ctrl = tensortype(σ){2,3,Bool}((i,j)->(i==3 || j==3))
+    return MMB.GeneralStressState(σ_ctrl, σ)
+end
+function MMB.GeneralStressState(::UniaxialNormalStress, TT::Type{<:SecondOrderTensor{3}})
+    σ = zero(TT)
+    σ_ctrl = tensortype(σ){2,3,Bool}((i,j)->(i==j∈(2,3)))
+    return MMB.GeneralStressState(σ_ctrl, σ)
+end
+
 all_states = (
     FullStressState(), UniaxialStrain(), PlaneStrain(),
-    UniaxialStress(), PlaneStress(), UniaxialNormalStress() )
+    UniaxialStress(), PlaneStress(), UniaxialNormalStress())
 iter_states = ( UniaxialStress(), PlaneStress(), UniaxialNormalStress())
 iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
                 ([3,4,5,7,8], [3,4,5]),
                 ([2,3], [2,3]))
 
-tensortype(::SymmetricTensor) = SymmetricTensor
-tensortype(::Tensor) = Tensor
+
 function run_timehistory(s::MMB.AbstractStressState, m::AbstractMaterial, ϵv::Vector{<:AbstractTensor}, t = collect(range(0,1;length=length(ϵ))))
     state = initial_material_state(m)
     cache = get_cache(m)
@@ -42,7 +61,6 @@ end
         end
     end
 
-    
     for (state, inds) in zip(iter_states, iter_mandel)
         for (TT, ii) in zip((Tensor, SymmetricTensor), inds)
             a = rand(TT{2,3})
@@ -93,6 +111,10 @@ end
     @test dσdϵ[1,1,1,1] ≈ E 
     @test ϵfull[2,2] ≈ ϵfull[3,3]
     @test ϵfull[2,2] ≈ -ν*Δϵ
+    gen = MMB.GeneralStressState(UniaxialStress(), SymmetricTensor{2,3})
+    ϵfull_ = SymmetricTensor{2,3}((i,j)->i==j==1 ? Δϵ : rand())
+    σ_, dσdϵ_ = material_response(gen, m, ϵfull_, old)
+    @test σ_[1,1] ≈ σ[1,1]
 
     # UniaxialStrain
     σ, dσdϵ, state, ϵfull = material_response(UniaxialStrain(), m, SymmetricTensor{2,1}((Δϵ,)), old, 0.0)
@@ -109,6 +131,10 @@ end
     @test σ ≈ dσdϵ⊡ϵ
     σ_full, dσdϵ_full, _ = material_response(m, ϵfull, old, 0.0)
     @test σ_full[1:2,1:2] ≈ σ
+    gen = MMB.GeneralStressState(PlaneStress(), SymmetricTensor{2,3})
+    ϵfull_ = SymmetricTensor{2,3}((i,j)->(i<3 && j<3) ? ϵ[i,j] : rand())
+    σ_, dσdϵ_ = material_response(gen, m, ϵfull_, old)
+    @test σ_[1:2,1:2] ≈ σ
 
     # PlaneStrain
     ϵ = rand(SymmetricTensor{2,2})

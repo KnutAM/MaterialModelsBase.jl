@@ -35,6 +35,7 @@ other strain components, and these will be used for the material evaluation.
 """
 struct UniaxialStrain <: AbstractStressState end
 
+# Cases with stress iterations
 """ 
     UniaxialStress()
 
@@ -68,9 +69,57 @@ This case is useful when simulating strain-controlled axial-shear experiments
 """
 struct UniaxialNormalStress <: AbstractStressState end
 
+"""
+    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3,Bool})
+
+Construct a general stress state controlled by `σ_ctrl` whose component is `true` if that 
+component is stress-controlled and `false` if it is strain-controlled. If stress-controlled,
+σ gives the value to which it is controlled. The current stress, for stress-controlled components
+can be updated by calling `update_stress_state!(s::GeneralStressState, σ)`. Components in 
+σ that are not stress-controlled are ignored. 
+"""
+mutable struct GeneralStressState{Nσ,TS,TI,TC} <: AbstractStressState
+    σ::TS
+    # Reduced mandel indicies
+    const σm_inds::NTuple{Nσ,Tuple{Int,Int}}    # tensor -> mandel: m -> (i,j)
+    const σ_minds::TI                           # mandel -> tensor: (i,j)->m 
+    const σ_ctrl::TC
+end
+function GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ)
+    Nσ = count(Tensors.get_data(σ_ctrl))
+    return GeneralStressState{Nσ}(σ_ctrl, σ)
+end
+function GeneralStressState{Nσ}(σ_ctrl::TC, σ::TS) where {Nσ,TC,TS}
+    @assert Nσ == count(Tensors.get_data(σ_ctrl))
+    TB = Tensors.get_base(TC)
+    @assert TB == Tensors.get_base(TS)
+    N = length(Tensors.get_data(σ_ctrl))
+    
+    σ_inds_mandel = zeros(Int, N)
+    m = 0
+    for (i, v) in enumerate(tovoigt(σ_ctrl))
+        if v 
+            m += 1
+            σ_inds_mandel[i] = m
+        end
+    end
+    σ_minds = fromvoigt(TB,σ_inds_mandel)
+    σm_inds = Tuple{Int,Int}[]
+    σm_minds_vec = Int[]
+    for i in 1:3, j in 1:(isa(σ, SymmetricTensor) ? i : 3)
+        if σ_ctrl[i,j]
+            push!(σm_inds, (i,j))
+            push!(σm_minds_vec, σ_minds[i,j])
+        end
+    end
+    copyto!(σm_inds, σm_inds[sortperm(σm_minds_vec)])
+    return GeneralStressState(σ, NTuple{Nσ}(σm_inds), σ_minds, σ_ctrl)
+end
+update_stress_state!(s::GeneralStressState, σ) = (s.σ = σ)
+
 const NoIterationState = Union{FullStressState,PlaneStrain,UniaxialStrain}
-const IterationState = Union{UniaxialStress, PlaneStress, UniaxialNormalStress}
-const State3D = Union{FullStressState, UniaxialNormalStress}
+const IterationState = Union{UniaxialStress, PlaneStress, UniaxialNormalStress, GeneralStressState}
+const State3D = Union{FullStressState, UniaxialNormalStress, GeneralStressState}
 const State2D = Union{PlaneStress, PlaneStrain}
 const State1D = Union{UniaxialStrain, UniaxialStress}
 
@@ -256,6 +305,28 @@ end
 function get_unknowns(::UniaxialNormalStress, A::AbstractTensor{4, 3}) 
     @SMatrix [A[2,2,2,2] A[2,2,3,3];
               A[3,3,2,2] A[3,3,3,3]]
+end
+
+# GeneralStressState
+function get_full_tensor(state::GeneralStressState{Nσ}, ::TT, v::SVector{Nσ,T}) where {Nσ,T,TT}
+    shear_factor = 1/√2
+    s(i,j) = i==j ? 1.0 : shear_factor
+    f(i,j) = state.σ_ctrl[i,j] ? v[state.σ_minds[i,j]]*s(i,j) : zero(T)
+    return Tensors.get_base(TT)(f)
+end
+
+function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3}) where Nσ
+    shear_factor = √2
+    s(i,j) = i==j ? 1.0 : shear_factor
+    f(c) = ((i,j) = c; a[i,j]*s(i,j)-state.σ[i,j])
+    return SVector{Nσ}((f(c) for c in state.σm_inds))
+end
+
+function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{4,3}) where Nσ
+    shear_factor = √2
+    s(i,j) = i==j ? 1.0 : shear_factor
+    f(c1,c2) = ((i,j) = c1; (k,l) = c2; a[i,j,k,l]*s(i,j)*s(k,l))
+    return SMatrix{Nσ,Nσ}((f(c1,c2) for c1 in state.σm_inds, c2 in state.σm_inds))
 end
 
 # Extract each part of the stiffness tensor as SMatrix

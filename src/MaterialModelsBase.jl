@@ -13,7 +13,8 @@ export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    # Ex
 export AbstractStressState
 export FullStressState, PlaneStrain, UniaxialStrain         # Non-iteration stress states
 export PlaneStress, UniaxialStress, UniaxialNormalStress    # Iterative stress state (unless overloaded)
-export GeneralStressState                                   # General iterative 3D stress state
+export GeneralStressState                                   # General iterative 3D non-zero stress state
+export update_stress_state!                                 # For nonzero stress-conditions
 
 # For parameter identification and differentiation of materials
 export material2vector, material2vector!, vector2material                   # Convert to/from parameter vector

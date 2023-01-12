@@ -2,6 +2,8 @@
 
 abstract type AbstractStressState end
 
+update_stress_state!(::AbstractStressState, σ) = nothing
+
 # Cases without stress iterations
 """ 
     FullStressState()

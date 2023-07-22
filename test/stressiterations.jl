@@ -169,5 +169,10 @@ end
     σvs, ϵv_fulls, dσdϵs = run_timehistory(stress_state, material, ϵv, collect(range(0.,tslow; length=N+1)))
     @test dσdϵf[1,1,1,1] ≈ 1.5E # Fast limit response
     @test dσdϵs[1,1,1,1] ≈ 1.0E # Slow limit response
+
+    # Test ReducedStressState wrapper 
+    w = ReducedStressState(stress_state, material)
+    @test initial_material_state(material) == initial_material_state(w)
+    @test get_cache(material) == get_cache(w)
 end
 

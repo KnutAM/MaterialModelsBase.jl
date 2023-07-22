@@ -144,6 +144,12 @@ end
     @test σ ≈ dσdϵ⊡ϵ
     σ_full, dσdϵ_full, _ = material_response(m, ϵfull, old, 0.0)
     @test σ_full[1:2,1:2] ≈ σ 
+
+    # Stress state wrapper
+    σ_w, dσdϵ_w, state_w, ϵfull_w = material_response(ReducedStressState(PlaneStrain(), m), ϵ, old, 0.0)
+    @test σ_w == σ
+    @test dσdϵ_w == dσdϵ
+    @test ϵfull_w == ϵfull
 end
 
 @testset "visco_elastic" begin
@@ -163,5 +169,10 @@ end
     σvs, ϵv_fulls, dσdϵs = run_timehistory(stress_state, material, ϵv, collect(range(0.,tslow; length=N+1)))
     @test dσdϵf[1,1,1,1] ≈ 1.5E # Fast limit response
     @test dσdϵs[1,1,1,1] ≈ 1.0E # Slow limit response
+
+    # Test ReducedStressState wrapper 
+    w = ReducedStressState(stress_state, material)
+    @test initial_material_state(material) == initial_material_state(w)
+    @test get_cache(material) == get_cache(w)
 end
 

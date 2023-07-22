@@ -27,3 +27,11 @@ UniaxialStress
 UniaxialNormalStress
 GeneralStressState
 ```
+
+## Reduced stress state wrapper
+When used in finite element codes, it is often convenient to collect both the stress 
+state and the material type into a single type that is passed to the element routine.
+The wrapper `ReducedStressState` is provided for that purpose.
+```@docs
+ReducedStressState
+```

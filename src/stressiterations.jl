@@ -1,7 +1,13 @@
 abstract type AbstractStressState end
 
-# Wrapper for a material which acts as the material itself, 
-# except that a reduced stress state is used. 
+"""
+    ReducedStressState(s::AbstractStressState, m::AbstractMaterial)
+    
+Creates a subtype of `AbstractMaterial` that wraps a stress state and a material, such that 
+calls to `material_response(w::ReducedStressState, args...)` gives the same result as 
+`material_response(s, m, args...)`, but forwards calls to `initial_material_state` and 
+`get_cache` with `m` as the argument. 
+"""
 struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: AbstractMaterial
     stress_state::S
     material::M

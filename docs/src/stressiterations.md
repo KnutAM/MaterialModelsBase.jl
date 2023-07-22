@@ -25,6 +25,7 @@ PlaneStress
 UniaxialStrain
 UniaxialStress
 UniaxialNormalStress
+GeneralStressState
 ```
 
 ## Reduced stress state wrapper

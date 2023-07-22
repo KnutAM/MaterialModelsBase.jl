@@ -1,6 +1,16 @@
-# Based on https://github.com/kimauth/MaterialModels.jl
-
 abstract type AbstractStressState end
+
+# Wrapper for a material which acts as the material itself, 
+# except that a reduced stress state is used. 
+struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: AbstractMaterial
+    stress_state::S
+    material::M
+end
+initial_material_state(rss::ReducedStressState) = initial_material_state(rss.material)
+get_cache(rss::ReducedStressState) = get_cache(rss.material)
+function material_response(rss::ReducedStressState, args...; kwargs...)
+    return material_response(rss.stress_state, rss.material, args...; kwargs...)
+end
 
 # Cases without stress iterations
 """ 

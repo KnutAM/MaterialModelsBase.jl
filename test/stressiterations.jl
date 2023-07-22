@@ -118,6 +118,12 @@ end
     @test σ ≈ dσdϵ⊡ϵ
     σ_full, dσdϵ_full, _ = material_response(m, ϵfull, old, 0.0)
     @test σ_full[1:2,1:2] ≈ σ 
+
+    # Stress state wrapper
+    σ_w, dσdϵ_w, state_w, ϵfull_w = material_response(ReducedStressState(PlaneStrain(), m), ϵ, old, 0.0)
+    @test σ_w == σ
+    @test dσdϵ_w == dσdϵ
+    @test ϵfull_w == ϵfull
 end
 
 @testset "visco_elastic" begin

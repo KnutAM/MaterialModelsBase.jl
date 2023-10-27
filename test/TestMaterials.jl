@@ -3,7 +3,7 @@ using MaterialModelsBase
 using Tensors, StaticArrays
 
 # Overloaded functions
-import MaterialModelsBase: material_response, initial_material_state, get_cache
+import MaterialModelsBase: material_response, initial_material_state, allocate_material_cache
 
 # Exported materials
 export LinearElastic, ViscoElastic
@@ -26,7 +26,7 @@ function material_response(
     ϵ::SymmetricTensor{2},
     old::NoMaterialState, 
     Δt=nothing, 
-    ::NoMaterialCache=get_cache(m), 
+    ::NoMaterialCache=allocate_material_cache(m), 
     ::NoExtraOutput=NoExtraOutput(); 
     options::Dict=Dict{Symbol,Any}())
 
@@ -60,7 +60,7 @@ function material_response(
     ϵ::SymmetricTensor{2},
     old::ViscoElasticState, 
     Δt, # Time step required
-    ::NoMaterialCache=get_cache(m), 
+    ::NoMaterialCache=allocate_material_cache(m), 
     ::NoExtraOutput=NoExtraOutput(); 
     options::Dict=Dict{Symbol,Any}())
     σ, ϵv = get_stress_ϵv(m,ϵ,old,Δt)

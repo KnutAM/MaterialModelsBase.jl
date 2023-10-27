@@ -1,13 +1,16 @@
 module MaterialModelsBase
 using Tensors, StaticArrays
 
-# Standard for all materials
-export material_response, initial_material_state, get_cache                 # Main (mandatory) functions
-export AbstractMaterial                                                     # Material parameters
-export AbstractMaterialState, NoMaterialState                               # State
-export AbstractMaterialCache, NoMaterialCache                               # Cache
-export AbstractExtraOutput, NoExtraOutput                                   # Extra output
-export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    # Exceptions
+# General interface for <:AbstractMaterial
+export AbstractMaterial                                 # Material parameters
+export material_response                                # Main (mandatory) functions
+export initial_material_state, allocate_material_cache  # Optional, but common functions to define
+export AbstractMaterialState, NoMaterialState           # State
+export AbstractMaterialCache, NoMaterialCache           # Cache
+export AbstractExtraOutput,   NoExtraOutput             # Extra output
+
+# Exceptions
+export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    
 
 # Stress state iterations
 export AbstractStressState
@@ -24,7 +27,6 @@ export MaterialDerivatives, differentiate_material!                         # Di
 export allocate_differentiation_output
 
 
-
 abstract type AbstractMaterial end
 
 """
@@ -34,7 +36,7 @@ abstract type AbstractMaterial end
         strain::Union{SecondOrderTensor,Vec}, 
         old::AbstractMaterialState, 
         Δt::Union{Number,Nothing}=nothing, 
-        cache::AbstractMaterialCache=get_cache(m), 
+        cache::AbstractMaterialCache=allocate_material_cache(m), 
         extras::AbstractExtraOutput=NoExtraOutput(); 
         options::Dict=Dict{Symbol}()
         )
@@ -58,7 +60,7 @@ for the material `m`, given the strain input `strain`.
 - `Δt`: The time step in the current increment. Defaults to `nothing`. 
 - `cache::AbstractMaterialCache`: Cache variables that can be used to avoid
   allocations during each call to the `material_response` function. 
-  This can be created by the [`get_cache`](@ref) function.
+  This can be created by the [`allocate_material_cache`](@ref) function.
 - `extras`: Updated with requested extra output. 
   Defaults to the empty struct `NoExtraOutput`
 
@@ -103,14 +105,14 @@ struct NoMaterialState <: AbstractMaterialState end
 
 # Material cache 
 """
-    get_cache(m::AbstractMaterial)
+    allocate_material_cache(m::AbstractMaterial)
 
 Return a `cache::AbstractMaterialCache` that can be used when 
 calling the material to reduce allocations
 
 Defaults to the empty `NoMaterialCache()`
 """
-function get_cache(::AbstractMaterial) 
+function allocate_material_cache(::AbstractMaterial) 
     return NoMaterialCache()
 end
 

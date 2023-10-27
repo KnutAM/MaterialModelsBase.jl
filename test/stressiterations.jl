@@ -34,7 +34,7 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
 
 function run_timehistory(s::MMB.AbstractStressState, m::AbstractMaterial, ϵv::Vector{<:AbstractTensor}, t = collect(range(0,1;length=length(ϵ))))
     state = initial_material_state(m)
-    cache = get_cache(m)
+    cache = allocate_material_cache(m)
     σv = eltype(ϵv)[]
     ϵv_full = tensortype(first(ϵv))[]
     local dσdϵ
@@ -173,6 +173,6 @@ end
     # Test ReducedStressState wrapper 
     w = ReducedStressState(stress_state, material)
     @test initial_material_state(material) == initial_material_state(w)
-    @test get_cache(material) == get_cache(w)
+    @test allocate_material_cache(material) == allocate_material_cache(w)
 end
 

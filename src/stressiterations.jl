@@ -8,14 +8,14 @@ update_stress_state!(::AbstractStressState, σ) = nothing
 Creates a subtype of `AbstractMaterial` that wraps a stress state and a material, such that 
 calls to `material_response(w::ReducedStressState, args...)` gives the same result as 
 `material_response(s, m, args...)`, but forwards calls to `initial_material_state` and 
-`get_cache` with `m` as the argument. 
+`allocate_material_cache` with `m` as the argument. 
 """
 struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: AbstractMaterial
     stress_state::S
     material::M
 end
 initial_material_state(rss::ReducedStressState) = initial_material_state(rss.material)
-get_cache(rss::ReducedStressState) = get_cache(rss.material)
+allocate_material_cache(rss::ReducedStressState) = allocate_material_cache(rss.material)
 function material_response(rss::ReducedStressState, args...; kwargs...)
     return material_response(rss.stress_state, rss.material, args...; kwargs...)
 end

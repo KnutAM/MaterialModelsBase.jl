@@ -26,7 +26,6 @@ export getnumtensorcomponents, getnumstatevars, getnumparams                # In
 export MaterialDerivatives, differentiate_material!                         # Differentiation routines
 export allocate_differentiation_output
 
-
 abstract type AbstractMaterial end
 
 """

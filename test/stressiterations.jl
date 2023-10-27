@@ -53,7 +53,7 @@ end
     for stress_state in all_states
         for TT in (Tensor, SymmetricTensor)
             ared = rand(TT{2,_getdim(stress_state)})
-            afull = MMB.get_full_tensor(stress_state, ared)
+            afull = MMB.expand_tensordim(stress_state, ared)
             @test _getdim(afull) == 3    # Full dimensional tensor
             @test norm(ared) ≈ norm(afull)    # Only add zeros
             # Test invertability of conversions

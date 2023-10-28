@@ -112,6 +112,8 @@ This is a variation of the uniaxial stress state, such that only
 The strain input must be 3d, and the components 
 ``\\epsilon_{22}`` and ``\\epsilon_{33}`` are used as initial guesses. 
 This case is useful when simulating strain-controlled axial-shear experiments.
+Note that the stress and stiffness outputs are the 3d tensors, and that the 
+stiffness is **not** modified to account for the stress constraints.
 
 The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
@@ -131,6 +133,9 @@ component is stress-controlled and `false` if it is strain-controlled. If stress
 σ gives the value to which it is controlled. The current stress, for stress-controlled components
 can be updated by calling `update_stress_state!(s::GeneralStressState, σ)`. Components in 
 σ that are not stress-controlled are ignored. 
+
+Note that the stress and stiffness outputs are the 3d tensors, and that the 
+stiffness is **not** modified to account for the stress constraints.
 
 The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
@@ -272,7 +277,7 @@ convert_stiffness(dσᶜdϵᶜ::SMatrix{4,4}, ::State2D, ::Tensor) = frommandel(
 #         i:  1,  2,  3,  4,  5
 # v contains 22, 33, 32, 31, 21
 function get_full_tensor(::UniaxialStress, ::SymmetricTensor, v::SVector{5,T}) where T
-    s = one(T)/√2      # 11,   21,     31,     22,   32,     33
+    s = T(1/√2)        # 11,   21,     31,     22,   32,     33
     SymmetricTensor{2,3}((0, v[5]*s, v[4]*s, v[1], v[3]*s, v[2]))
 end
 function get_unknowns(::UniaxialStress, a::SymmetricTensor{2,3})
@@ -314,7 +319,7 @@ end
 #         i:  1,  2,  3
 # v contains 33, 23, 13
 function get_full_tensor(::PlaneStress, ::SymmetricTensor, v::SVector{3,T}) where T
-    s = one(T)/√2      # 11,21,   31,  22,   32,     33
+    s = T(1/√2)        # 11,21,   31,  22,   32,     33
     SymmetricTensor{2,3}((0, 0, v[3]*s, 0, v[2]*s, v[1]))
 end
 function get_unknowns(::PlaneStress, a::SymmetricTensor{2,3})
@@ -368,22 +373,22 @@ end
 
 # GeneralStressState
 function get_full_tensor(state::GeneralStressState{Nσ}, ::TT, v::SVector{Nσ,T}) where {Nσ,T,TT}
-    shear_factor = one(T)/√2
+    shear_factor = T(1/√2)
     s(i,j) = i==j ? one(T) : shear_factor
     f(i,j) = state.σ_ctrl[i,j] ? v[state.σ_minds[i,j]]*s(i,j) : zero(T)
     return Tensors.get_base(TT)(f)
 end
 
-function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3}) where Nσ
-    shear_factor = √2
-    s(i,j) = i==j ? 1.0 : shear_factor
-    f(c) = ((i,j) = c; a[i,j]*s(i,j)-state.σ[i,j])
+function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}) where {Nσ, T}
+    shear_factor = T(√2)
+    s(i,j) = i==j ? one(T) : shear_factor
+    f(c) = ((i,j) = c; s(i,j)*(a[i,j]-state.σ[i,j]))
     return SVector{Nσ}((f(c) for c in state.σm_inds))
 end
 
-function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{4,3}) where Nσ
-    shear_factor = √2
-    s(i,j) = i==j ? 1.0 : shear_factor
+function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{4,3,T}) where {Nσ,T}
+    shear_factor = T(√2)
+    s(i,j) = i==j ? one(T) : shear_factor
     f(c1,c2) = ((i,j) = c1; (k,l) = c2; a[i,j,k,l]*s(i,j)*s(k,l))
     return SMatrix{Nσ,Nσ}((f(c1,c2) for c1 in state.σm_inds, c2 in state.σm_inds))
 end

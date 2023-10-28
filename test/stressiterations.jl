@@ -123,6 +123,18 @@ end
     σ_full, dσdϵ_full, _ = material_response(m, ϵfull, old, 0.0)
     @test σ_full[2,2] ≈ λ*Δϵ
 
+    # UniaxialNormalStress
+    ϵ11_value = rand()
+    ϵ11 = SymmetricTensor{2,1}((ϵ11_value,))
+    ϵ = SymmetricTensor{2,3}((i,j)-> i==j==1 ? ϵ11_value : 0.0)
+    σ1, dσdϵ1, _, ϵfull1 = material_response(UniaxialStress(), m, ϵ11, old, 0.0)
+    σ2, dσdϵ2, _, ϵfull2 = material_response(UniaxialStrain(), m, ϵ11, old, 0.0)
+    σ3, dσdϵ3, _, ϵfull3 = material_response(UniaxialNormalStress(), m, ϵ, old, 0.0)
+    @test σ1[1,1] ≈ σ3[1,1]
+    @test abs(σ3[2,2]) < 1e-8 
+    @test abs(σ3[3,3]) < 1e-8
+    @test dσdϵ3[1,1,1,1] ≈ dσdϵ2[1,1,1,1]
+
     # PlaneStress
     ϵ = rand(SymmetricTensor{2,2})
     σ, dσdϵ, state, ϵfull = material_response(PlaneStress(), m, ϵ, old, 0.0)
@@ -154,13 +166,14 @@ end
     @test ϵfull_gen ≈ ϵfull
     # The 3d material stiffness is given, so this should match the plane strain output
     @test dσdϵ_gen[1:2, 1:2, 1:2, 1:2] ≈ dσdϵ
-    
+
     # Stress state wrapper
+    ϵ = rand(SymmetricTensor{2,2})
+    σ, dσdϵ, state, ϵfull = material_response(PlaneStrain(), m, ϵ, old, 0.0)
     σ_w, dσdϵ_w, state_w, ϵfull_w = material_response(ReducedStressState(PlaneStrain(), m), ϵ, old, 0.0)
     @test σ_w == σ
     @test dσdϵ_w == dσdϵ
     @test ϵfull_w == ϵfull
-
 end
 
 @testset "visco_elastic" begin

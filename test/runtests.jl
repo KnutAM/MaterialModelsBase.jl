@@ -10,3 +10,5 @@ using .TestMaterials
 include("stressiterations.jl")
 
 include("differentiation.jl")
+
+include("errors.jl")

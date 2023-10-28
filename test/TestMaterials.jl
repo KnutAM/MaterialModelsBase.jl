@@ -24,7 +24,7 @@ end
 function MMB.material_response(
     m::LinearElastic, 
     ϵ::SymmetricTensor{2},
-    old::NoMaterialState, 
+    old::NoMaterialState=NoMaterialState(), 
     Δt=nothing, 
     ::NoMaterialCache=allocate_material_cache(m), 
     ::NoExtraOutput=NoExtraOutput())

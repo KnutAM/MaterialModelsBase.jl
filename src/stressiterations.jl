@@ -7,8 +7,8 @@ update_stress_state!(::AbstractStressState, σ) = nothing
     
 Creates a subtype of `AbstractMaterial` that wraps a stress state and a material, such that 
 calls to `material_response(w::ReducedStressState, args...)` gives the same result as 
-`material_response(s, m, args...)`, but forwards calls to `initial_material_state` and 
-`allocate_material_cache` with `m` as the argument. 
+`material_response(s, m, args...)`. 
+Calls to `initial_material_state` and `allocate_material_cache` are forwarded with `m` as the argument. 
 """
 struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: AbstractMaterial
     stress_state::S
@@ -54,61 +54,101 @@ other strain components, and these will be used for the material evaluation.
 struct UniaxialStrain <: AbstractStressState end
 
 # Cases with stress iterations
+"""
+    IterationSettings(;tolerance=1e-8, max_iter=10)
+
+Settings for stress iterations. Constructors for iterative stress states forwards
+given keyword arguments to this constructor and saves the result.
+"""
+@kwdef struct IterationSettings{T}
+    tolerance::T=1.e-8
+    max_iter::Int=10
+end
+get_tolerance(is::IterationSettings) = is.tolerance
+get_max_iter(is::IterationSettings) = is.max_iter
+
 """ 
-    UniaxialStress()
+    UniaxialStress(; kwargs...)
 
 Uniaxial stress such that 
 ``\\sigma_{ij}=0 \\forall (i,j)\\neq (1,1)``
 The strain input can be 1d (`SecondOrderTensor{1}`).
 A 3d input is also accepted and used as an initial 
 guess for the unknown strain components. 
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-struct UniaxialStress <: AbstractStressState end
+struct UniaxialStress{T} <: AbstractStressState 
+    settings::IterationSettings{T}
+end
+UniaxialStress(; kwargs...) = UniaxialStress(IterationSettings(; kwargs...))
+get_tolerance(ss::UniaxialStress) = get_tolerance(ss.settings)
+get_max_iter(ss::UniaxialStress) = get_max_iter(ss.settings)
 
 """ 
-    PlaneStress()
+    PlaneStress(; kwargs...)
 
 Plane stress such that 
 ``\\sigma_{33}=\\sigma_{23}=\\sigma_{13}=\\sigma_{32}=\\sigma_{31}=0``
 The strain input should be at least 2d (components 11, 12, 21, and 22).
 A 3d input is also accepted and used as an initial guess for the unknown 
 out-of-plane strain components. 
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-struct PlaneStress <: AbstractStressState end
+struct PlaneStress{T} <: AbstractStressState 
+    settings::IterationSettings{T}
+end
+PlaneStress(; kwargs...) = PlaneStress(IterationSettings(; kwargs...))
+
+get_tolerance(ss::PlaneStress) = get_tolerance(ss.settings)
+get_max_iter(ss::PlaneStress) = get_max_iter(ss.settings)
 
 """ 
-    UniaxialNormalStress()
+    UniaxialNormalStress(; kwargs...)
 
 This is a variation of the uniaxial stress state, such that only
 ``\\sigma_{22}=\\sigma_{33}=0``
 The strain input must be 3d, and the components 
 ``\\epsilon_{22}`` and ``\\epsilon_{33}`` are used as initial guesses. 
-This case is useful when simulating strain-controlled axial-shear experiments
+This case is useful when simulating strain-controlled axial-shear experiments.
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-struct UniaxialNormalStress <: AbstractStressState end
+struct UniaxialNormalStress{T} <: AbstractStressState 
+    settings::IterationSettings{T}
+end
+UniaxialNormalStress(; kwargs...) = UniaxialNormalStress(IterationSettings(; kwargs...))
+
+get_tolerance(ss::UniaxialNormalStress) = get_tolerance(ss.settings)
+get_max_iter(ss::UniaxialNormalStress) = get_max_iter(ss.settings)
 
 """
-    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3,Bool})
+    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3,Bool}; kwargs...)
 
 Construct a general stress state controlled by `σ_ctrl` whose component is `true` if that 
 component is stress-controlled and `false` if it is strain-controlled. If stress-controlled,
 σ gives the value to which it is controlled. The current stress, for stress-controlled components
 can be updated by calling `update_stress_state!(s::GeneralStressState, σ)`. Components in 
 σ that are not stress-controlled are ignored. 
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-mutable struct GeneralStressState{Nσ,TS,TI,TC} <: AbstractStressState
+mutable struct GeneralStressState{Nσ,TS,TI,TC,T} <: AbstractStressState
     σ::TS
     # Reduced mandel indicies
     const σm_inds::NTuple{Nσ,Tuple{Int,Int}}    # tensor -> mandel: m -> (i,j)
     const σ_minds::TI                           # mandel -> tensor: (i,j)->m 
     const σ_ctrl::TC
+    settings::IterationSettings{T}
 end
-function GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ)
+function GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ; kwargs...)
     Nσ = count(Tensors.get_data(σ_ctrl))
     return GeneralStressState{Nσ}(σ_ctrl, σ)
 end
-function GeneralStressState{Nσ}(σ_ctrl::TC, σ::TS) where {Nσ,TC,TS}
+function GeneralStressState{Nσ}(σ_ctrl::TC, σ::TS; kwargs...) where {Nσ,TC,TS}
     @assert Nσ == count(Tensors.get_data(σ_ctrl))
+    settings = IterationSettings(; kwargs...)
     TB = Tensors.get_base(TC)
     @assert TB == Tensors.get_base(TS)
     N = length(Tensors.get_data(σ_ctrl))
@@ -131,9 +171,12 @@ function GeneralStressState{Nσ}(σ_ctrl::TC, σ::TS) where {Nσ,TC,TS}
         end
     end
     copyto!(σm_inds, σm_inds[sortperm(σm_minds_vec)])
-    return GeneralStressState(σ, NTuple{Nσ}(σm_inds), σ_minds, σ_ctrl)
+    return GeneralStressState(σ, NTuple{Nσ}(σm_inds), σ_minds, σ_ctrl, settings)
 end
+
 update_stress_state!(s::GeneralStressState, σ) = (s.σ = σ)
+get_tolerance(ss::GeneralStressState) = get_tolerance(ss.settings)
+get_max_iter(ss::GeneralStressState) = get_max_iter(ss.settings)
 
 const NoIterationState = Union{FullStressState,PlaneStrain,UniaxialStrain}
 const IterationState = Union{UniaxialStress, PlaneStress, UniaxialNormalStress, GeneralStressState}
@@ -169,12 +212,11 @@ function reduced_material_response(
     stress_state::NoIterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,
-    args...;
-    options::Dict=Dict{Symbol,Any}(),
+    args...; kwargs...
     )
 
     ϵ_full = expand_tensordim(stress_state, ϵ)
-    σ, dσdϵ, new_state = material_response(m, ϵ_full, args...; options=options)
+    σ, dσdϵ, new_state = material_response(m, ϵ_full, args...; kwargs...)
     return reduce_tensordim(stress_state, σ), reduce_tensordim(stress_state, dσdϵ), new_state, ϵ_full
 end
 
@@ -182,19 +224,19 @@ function reduced_material_response(
     stress_state::IterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,
-    args...;
-    options::Dict=Dict{Symbol,Any}(),
+    args...; kwargs...
     )
 
-    # Newton options, typecast ensures type stability
-    tol = Float64(get(options, :stress_state_tol, 1.e-8))
-    maxiter = Int(get(options, :stress_state_maxiter, 10))
-
+    # Newton options
+    tol = get_tolerance(stress_state)
+    maxiter = get_max_iter(stress_state)
+    
     ϵ_full = expand_tensordim(stress_state, ϵ)
 
     for _ in 1:maxiter
-        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...; options=options)
+        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...; kwargs...)
         σ_mandel = get_unknowns(stress_state, σ_full)
+
         if norm(σ_mandel) < tol
             dσdϵ = reduce_stiffness(stress_state, dσdϵ_full)
             return reduce_tensordim(stress_state, σ_full), dσdϵ, new_state, ϵ_full

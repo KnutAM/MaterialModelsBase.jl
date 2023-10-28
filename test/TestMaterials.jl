@@ -1,9 +1,9 @@
 module TestMaterials
 using MaterialModelsBase
-using Tensors, StaticArrays
+using Tensors, StaticArrays, ForwardDiff
 
 # Overloaded functions
-import MaterialModelsBase: material_response, initial_material_state, allocate_material_cache
+import MaterialModelsBase as MMB
 
 # Exported materials
 export LinearElastic, ViscoElastic
@@ -21,18 +21,36 @@ function get_stiffness(m::LinearElastic)
     return 2*m.G*Isymdev + m.K*Ivol
 end
 
-function material_response(
+function MMB.material_response(
     m::LinearElastic, 
     ϵ::SymmetricTensor{2},
     old::NoMaterialState, 
     Δt=nothing, 
     ::NoMaterialCache=allocate_material_cache(m), 
-    ::NoExtraOutput=NoExtraOutput(); 
-    options::Dict=Dict{Symbol,Any}())
+    ::NoExtraOutput=NoExtraOutput())
 
     dσdϵ = get_stiffness(m)
     σ = dσdϵ⊡ϵ
     return σ, dσdϵ, old
+end
+
+MMB.get_num_params(::LinearElastic) = 2
+function MMB.material2vector!(v::Vector, m::LinearElastic)
+    v[1] = m.G
+    v[2] = m.K
+    return v
+end
+MMB.vector2material(v::Vector, ::LinearElastic) = LinearElastic(v[1], v[2])
+
+function MMB.differentiate_material!(
+    diff::MaterialDerivatives,
+    m::LinearElastic,
+    ϵ::SymmetricTensor,
+    args...)
+    tomandel!(diff.dσdϵ, get_stiffness(m))
+
+    σ_from_p(p::Vector) = tomandel(get_stiffness(vector2material(p, m))⊡ϵ)
+    ForwardDiff.jacobian!(diff.dσdp, σ_from_p, material2vector(m))
 end
 
 # ViscoElastic material (decide model)
@@ -44,7 +62,7 @@ end
 struct ViscoElasticState{T} <: AbstractMaterialState
     ϵv::SymmetricTensor{2,3,T,6}
 end
-initial_material_state(::ViscoElastic) = ViscoElasticState(zero(SymmetricTensor{2,3}))
+MMB.initial_material_state(::ViscoElastic) = ViscoElasticState(zero(SymmetricTensor{2,3}))
 
 # To allow easy automatic differentiation
 function get_stress_ϵv(m::ViscoElastic, ϵ::SymmetricTensor{2,3}, old::ViscoElasticState, Δt)
@@ -55,14 +73,14 @@ function get_stress_ϵv(m::ViscoElastic, ϵ::SymmetricTensor{2,3}, old::ViscoEla
     return σ, ϵv
 end
 
-function material_response(
-    m::ViscoElastic, 
-    ϵ::SymmetricTensor{2},
-    old::ViscoElasticState, 
-    Δt, # Time step required
-    ::NoMaterialCache=allocate_material_cache(m), 
-    ::NoExtraOutput=NoExtraOutput(); 
-    options::Dict=Dict{Symbol,Any}())
+function MMB.material_response(
+        m::ViscoElastic, 
+        ϵ::SymmetricTensor{2},
+        old::ViscoElasticState, 
+        Δt, # Time step required
+        ::NoMaterialCache=allocate_material_cache(m), 
+        ::NoExtraOutput=NoExtraOutput())
+
     σ, ϵv = get_stress_ϵv(m,ϵ,old,Δt)
     dσdϵ = gradient(ϵ_->get_stress_ϵv(m,ϵ_,old,Δt)[1], ϵ)
     return σ, dσdϵ, ViscoElasticState(ϵv)

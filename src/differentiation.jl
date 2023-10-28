@@ -30,6 +30,13 @@ Return the number of material parameters in `m`. No default value implemented.
 """
 function get_num_params end
 
+"""
+    get_parameter_type(m::AbstractMaterial)
+
+Return the number type for the scalar material parameters, defaults to `Float64`
+"""
+get_parameter_type(::AbstractMaterial) = Float64
+
 # Conversion to vectors of parameters
 """
     material2vector!(v::AbstractVector, m::AbstractMaterial)
@@ -49,7 +56,10 @@ function vector2material end
 Out-of place version of `material2vector!`. Given `get_num_params`, this function
 does not need to be overloaded unless another datatype than Float64 should be used.
 """
-material2vector(m::AbstractMaterial) = material2vector!(zeros(get_num_params(m)), m)
+function material2vector(m::AbstractMaterial)
+    T = get_parameter_type(m)
+    return material2vector!(zeros(T, get_num_params(m)), m)
+end
 
 struct MaterialDerivatives{T}
     dσdϵ::Matrix{T}
@@ -61,13 +71,24 @@ struct MaterialDerivatives{T}
 end
 
 """
-    MaterialDerivatives(m::AbstractMaterial, T=Float64)
+    MaterialDerivatives(m::AbstractMaterial)
 
-A struct that saves all derivative information using a `Matrix{T}` for each derivative.
-If `get_num_tensorcomponents`, `get_num_statevars`, and `get_num_params` are implemented for `m`,
-`MaterialDerivatives` does not need to be overloaded for `m`. 
+A struct that saves all derivative information using a `Matrix{T}` for each derivative,
+where `T=get_parameter_type(m)`. The dimensions are obtained from `get_num_tensorcomponents`, 
+`get_num_statevars`, and `get_num_params`. The values should be updated in `differentiate_material!`
+by direct access of the fields, where `σ` is the stress, `ϵ` the strain, `s` and `ⁿs` are the current 
+and old state variables, and `p` the material parameter vector.
+
+* `dσdϵ`
+* `dσdⁿs`
+* `dσdp`
+* `dsdϵ`
+* `dsdⁿs`
+* `dsdp`
+
 """
-function MaterialDerivatives(m::AbstractMaterial, T=Float64)
+function MaterialDerivatives(m::AbstractMaterial)
+    T = get_parameter_type(m)
     n_tensor = get_num_tensorcomponents(m)
     n_state = get_num_statevars(m)
     n_params = get_num_params(m)
@@ -102,10 +123,10 @@ allocate_differentiation_output(::AbstractMaterial) = NoExtraOutput()
         Δt,
         cache::AbstractMaterialCache
         dσdϵ::AbstractTensor, 
-        extra::AbstractExtraOutput;
-        options=nothing
+        extra::AbstractExtraOutput
         )
 
-Calculate the derivatives and save them in `diff`. 
+Calculate the derivatives and save them in `diff`, see
+[`MaterialDerivatives`](@ref) for a description of the fields in `diff`.
 """
 function differentiate_material! end

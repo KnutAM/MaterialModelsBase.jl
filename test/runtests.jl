@@ -8,3 +8,5 @@ include("TestMaterials.jl")
 using .TestMaterials
 
 include("stressiterations.jl")
+
+include("differentiation.jl")

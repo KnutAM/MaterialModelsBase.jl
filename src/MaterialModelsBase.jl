@@ -36,8 +36,7 @@ abstract type AbstractMaterial end
         old::AbstractMaterialState, 
         Δt::Union{Number,Nothing}=nothing, 
         cache::AbstractMaterialCache=allocate_material_cache(m), 
-        extras::AbstractExtraOutput=NoExtraOutput(); 
-        options::Dict=Dict{Symbol}()
+        extras::AbstractExtraOutput=NoExtraOutput()
         )
 
 Calculate the stress/traction, stiffness and updated state variables 
@@ -62,10 +61,6 @@ for the material `m`, given the strain input `strain`.
   This can be created by the [`allocate_material_cache`](@ref) function.
 - `extras`: Updated with requested extra output. 
   Defaults to the empty struct `NoExtraOutput`
-
-# Optional keyword arguments
-- `options`: Additional options that may be specific for each material. 
-  This is also used for stress iterations, see [Stress states](@ref).
 
 # Outputs
 1) `stress`, is the stress measure that is energy conjugated to the `strain` (2nd) input.

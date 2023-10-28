@@ -22,7 +22,7 @@ export update_stress_state!                                 # For nonzero stress
 
 # For parameter identification and differentiation of materials
 export material2vector, material2vector!, vector2material                   # Convert to/from parameter vector
-export getnumtensorcomponents, getnumstatevars, getnumparams                # Information about the specific material 
+export get_num_tensorcomponents, get_num_statevars, get_num_params                # Information about the specific material 
 export MaterialDerivatives, differentiate_material!                         # Differentiation routines
 export allocate_differentiation_output
 
@@ -135,33 +135,6 @@ struct NoExtraOutput <: AbstractExtraOutput end
 
 include("differentiation.jl")
 include("stressiterations.jl")
-
-# Convergence errors
-"""
-    MaterialConvergenceError
-
-Can be used to catch errors related to the material not converging. 
-"""
-abstract type MaterialConvergenceError <: Exception end
-#The following is only needed if additional formatting is desired:
-#Base.showerror(io::IO, e::MaterialConvergenceError) = println(io, e.msg)
-
-"""
-    NoLocalConvergence(msg::String)
-
-Throw if the material_response routine doesn't converge internally
-"""
-struct NoLocalConvergence <: MaterialConvergenceError
-    msg::String
-end
-
-"""
-    NoStressConvergence(msg::String)
-
-This is thrown if the stress iterations don't converge, see [Stress states](@ref)
-"""
-struct NoStressConvergence <: MaterialConvergenceError
-    msg::String
-end
+include("ErrorExceptions.jl")
 
 end

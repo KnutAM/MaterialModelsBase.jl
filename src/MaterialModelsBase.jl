@@ -1,5 +1,6 @@
 module MaterialModelsBase
 using Tensors, StaticArrays
+import Base: @kwdef
 
 # General interface for <:AbstractMaterial
 export AbstractMaterial                                 # Material parameters

@@ -7,15 +7,15 @@ update_stress_state!(::AbstractStressState, σ) = nothing
     
 Creates a subtype of `AbstractMaterial` that wraps a stress state and a material, such that 
 calls to `material_response(w::ReducedStressState, args...)` gives the same result as 
-`material_response(s, m, args...)`, but forwards calls to `initial_material_state` and 
-`get_cache` with `m` as the argument. 
+`material_response(s, m, args...)`. 
+Calls to `initial_material_state` and `allocate_material_cache` are forwarded with `m` as the argument. 
 """
 struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: AbstractMaterial
     stress_state::S
     material::M
 end
 initial_material_state(rss::ReducedStressState) = initial_material_state(rss.material)
-get_cache(rss::ReducedStressState) = get_cache(rss.material)
+allocate_material_cache(rss::ReducedStressState) = allocate_material_cache(rss.material)
 function material_response(rss::ReducedStressState, args...; kwargs...)
     return material_response(rss.stress_state, rss.material, args...; kwargs...)
 end
@@ -54,61 +54,106 @@ other strain components, and these will be used for the material evaluation.
 struct UniaxialStrain <: AbstractStressState end
 
 # Cases with stress iterations
+"""
+    IterationSettings(;tolerance=1e-8, max_iter=10)
+
+Settings for stress iterations. Constructors for iterative stress states forwards
+given keyword arguments to this constructor and saves the result.
+"""
+@kwdef struct IterationSettings{T}
+    tolerance::T=1.e-8
+    max_iter::Int=10
+end
+get_tolerance(is::IterationSettings) = is.tolerance
+get_max_iter(is::IterationSettings) = is.max_iter
+
 """ 
-    UniaxialStress()
+    UniaxialStress(; kwargs...)
 
 Uniaxial stress such that 
 ``\\sigma_{ij}=0 \\forall (i,j)\\neq (1,1)``
 The strain input can be 1d (`SecondOrderTensor{1}`).
 A 3d input is also accepted and used as an initial 
 guess for the unknown strain components. 
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-struct UniaxialStress <: AbstractStressState end
+struct UniaxialStress{T} <: AbstractStressState 
+    settings::IterationSettings{T}
+end
+UniaxialStress(; kwargs...) = UniaxialStress(IterationSettings(; kwargs...))
+get_tolerance(ss::UniaxialStress) = get_tolerance(ss.settings)
+get_max_iter(ss::UniaxialStress) = get_max_iter(ss.settings)
 
 """ 
-    PlaneStress()
+    PlaneStress(; kwargs...)
 
 Plane stress such that 
 ``\\sigma_{33}=\\sigma_{23}=\\sigma_{13}=\\sigma_{32}=\\sigma_{31}=0``
 The strain input should be at least 2d (components 11, 12, 21, and 22).
 A 3d input is also accepted and used as an initial guess for the unknown 
 out-of-plane strain components. 
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-struct PlaneStress <: AbstractStressState end
+struct PlaneStress{T} <: AbstractStressState 
+    settings::IterationSettings{T}
+end
+PlaneStress(; kwargs...) = PlaneStress(IterationSettings(; kwargs...))
+
+get_tolerance(ss::PlaneStress) = get_tolerance(ss.settings)
+get_max_iter(ss::PlaneStress) = get_max_iter(ss.settings)
 
 """ 
-    UniaxialNormalStress()
+    UniaxialNormalStress(; kwargs...)
 
 This is a variation of the uniaxial stress state, such that only
 ``\\sigma_{22}=\\sigma_{33}=0``
 The strain input must be 3d, and the components 
 ``\\epsilon_{22}`` and ``\\epsilon_{33}`` are used as initial guesses. 
-This case is useful when simulating strain-controlled axial-shear experiments
+This case is useful when simulating strain-controlled axial-shear experiments.
+Note that the stress and stiffness outputs are the 3d tensors, and that the 
+stiffness is **not** modified to account for the stress constraints.
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-struct UniaxialNormalStress <: AbstractStressState end
+struct UniaxialNormalStress{T} <: AbstractStressState 
+    settings::IterationSettings{T}
+end
+UniaxialNormalStress(; kwargs...) = UniaxialNormalStress(IterationSettings(; kwargs...))
+
+get_tolerance(ss::UniaxialNormalStress) = get_tolerance(ss.settings)
+get_max_iter(ss::UniaxialNormalStress) = get_max_iter(ss.settings)
 
 """
-    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3,Bool})
+    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3,Bool}; kwargs...)
 
 Construct a general stress state controlled by `σ_ctrl` whose component is `true` if that 
 component is stress-controlled and `false` if it is strain-controlled. If stress-controlled,
 σ gives the value to which it is controlled. The current stress, for stress-controlled components
 can be updated by calling `update_stress_state!(s::GeneralStressState, σ)`. Components in 
 σ that are not stress-controlled are ignored. 
+
+Note that the stress and stiffness outputs are the 3d tensors, and that the 
+stiffness is **not** modified to account for the stress constraints.
+
+The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
-mutable struct GeneralStressState{Nσ,TS,TI,TC} <: AbstractStressState
+mutable struct GeneralStressState{Nσ,TS,TI,TC,T} <: AbstractStressState
     σ::TS
     # Reduced mandel indicies
     const σm_inds::NTuple{Nσ,Tuple{Int,Int}}    # tensor -> mandel: m -> (i,j)
     const σ_minds::TI                           # mandel -> tensor: (i,j)->m 
     const σ_ctrl::TC
+    settings::IterationSettings{T}
 end
-function GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ)
+function GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ; kwargs...)
     Nσ = count(Tensors.get_data(σ_ctrl))
     return GeneralStressState{Nσ}(σ_ctrl, σ)
 end
-function GeneralStressState{Nσ}(σ_ctrl::TC, σ::TS) where {Nσ,TC,TS}
+function GeneralStressState{Nσ}(σ_ctrl::TC, σ::TS; kwargs...) where {Nσ,TC,TS}
     @assert Nσ == count(Tensors.get_data(σ_ctrl))
+    settings = IterationSettings(; kwargs...)
     TB = Tensors.get_base(TC)
     @assert TB == Tensors.get_base(TS)
     N = length(Tensors.get_data(σ_ctrl))
@@ -131,9 +176,12 @@ function GeneralStressState{Nσ}(σ_ctrl::TC, σ::TS) where {Nσ,TC,TS}
         end
     end
     copyto!(σm_inds, σm_inds[sortperm(σm_minds_vec)])
-    return GeneralStressState(σ, NTuple{Nσ}(σm_inds), σ_minds, σ_ctrl)
+    return GeneralStressState(σ, NTuple{Nσ}(σm_inds), σ_minds, σ_ctrl, settings)
 end
+
 update_stress_state!(s::GeneralStressState, σ) = (s.σ = σ)
+get_tolerance(ss::GeneralStressState) = get_tolerance(ss.settings)
+get_max_iter(ss::GeneralStressState) = get_max_iter(ss.settings)
 
 const NoIterationState = Union{FullStressState,PlaneStrain,UniaxialStrain}
 const IterationState = Union{UniaxialStress, PlaneStress, UniaxialNormalStress, GeneralStressState}
@@ -141,14 +189,13 @@ const State3D = Union{FullStressState, UniaxialNormalStress, GeneralStressState}
 const State2D = Union{PlaneStress, PlaneStrain}
 const State1D = Union{UniaxialStrain, UniaxialStress}
 
-# Translate from reduced input to full tensors
-# Note: Also used to translate from unknowns to full tensors
-get_full_tensor(::AbstractStressState, a::Tensors.AllTensors{3}) = a
-#get_full_tensor(::AbstractStressState, v::Vec{dim,T}) where {dim,T} = Vec{3,T}(i->i>dim ? zero(T) : v[i])
-function get_full_tensor(::AbstractStressState, a::Tensor{2,dim,T}) where {dim,T} 
+# Translate from reduced dim input to full tensors
+expand_tensordim(::AbstractStressState, a::Tensors.AllTensors{3}) = a
+#expand_tensordim(::AbstractStressState, v::Vec{dim,T}) where {dim,T} = Vec{3,T}(i->i>dim ? zero(T) : v[i])
+function expand_tensordim(::AbstractStressState, a::Tensor{2,dim,T}) where {dim,T} 
     return Tensor{2,3}((i,j)-> (i<=dim && j<=dim) ? a[i,j] : zero(T))
 end
-function get_full_tensor(::AbstractStressState, a::SymmetricTensor{2,dim,T}) where {dim,T} 
+function expand_tensordim(::AbstractStressState, a::SymmetricTensor{2,dim,T}) where {dim,T} 
     return SymmetricTensor{2,3}((i,j)-> (i<=dim && j<=dim) ? a[i,j] : zero(T))
 end
 
@@ -170,12 +217,11 @@ function reduced_material_response(
     stress_state::NoIterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,
-    args...;
-    options::Dict=Dict{Symbol,Any}(),
+    args...; kwargs...
     )
 
-    ϵ_full = get_full_tensor(stress_state, ϵ)
-    σ, dσdϵ, new_state = material_response(m, ϵ_full, args...; options=options)
+    ϵ_full = expand_tensordim(stress_state, ϵ)
+    σ, dσdϵ, new_state = material_response(m, ϵ_full, args...; kwargs...)
     return reduce_tensordim(stress_state, σ), reduce_tensordim(stress_state, dσdϵ), new_state, ϵ_full
 end
 
@@ -183,19 +229,19 @@ function reduced_material_response(
     stress_state::IterationState,
     m::AbstractMaterial,
     ϵ::AbstractTensor,
-    args...;
-    options::Dict=Dict{Symbol,Any}(),
+    args...; kwargs...
     )
 
-    # Newton options, typecast ensures type stability
-    tol = Float64(get(options, :stress_state_tol, 1.e-8))
-    maxiter = Int(get(options, :stress_state_maxiter, 10))
-
-    ϵ_full = get_full_tensor(stress_state, ϵ)
+    # Newton options
+    tol = get_tolerance(stress_state)
+    maxiter = get_max_iter(stress_state)
+    
+    ϵ_full = expand_tensordim(stress_state, ϵ)
 
     for _ in 1:maxiter
-        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...; options=options)
+        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...; kwargs...)
         σ_mandel = get_unknowns(stress_state, σ_full)
+
         if norm(σ_mandel) < tol
             dσdϵ = reduce_stiffness(stress_state, dσdϵ_full)
             return reduce_tensordim(stress_state, σ_full), dσdϵ, new_state, ϵ_full
@@ -230,8 +276,8 @@ convert_stiffness(dσᶜdϵᶜ::SMatrix{4,4}, ::State2D, ::Tensor) = frommandel(
 # -SymmetricTensor
 #         i:  1,  2,  3,  4,  5
 # v contains 22, 33, 32, 31, 21
-function get_full_tensor(::UniaxialStress, ::SymmetricTensor, v::SVector{5})
-    s = 1/√2           # 11,   21,     31,     22,   32,     33
+function get_full_tensor(::UniaxialStress, ::SymmetricTensor, v::SVector{5,T}) where T
+    s = T(1/√2)        # 11,   21,     31,     22,   32,     33
     SymmetricTensor{2,3}((0, v[5]*s, v[4]*s, v[1], v[3]*s, v[2]))
 end
 function get_unknowns(::UniaxialStress, a::SymmetricTensor{2,3})
@@ -248,7 +294,7 @@ end
 # -Tensor
 #         i:  1,  2,  3,  4,  5,  6,  7,  8
 # v contains 22, 33, 23, 13, 12, 32, 31, 21
-function get_full_tensor(::UniaxialStress, ϵ::Tensor, v::SVector{8,T}) where T
+function get_full_tensor(::UniaxialStress, ϵ::Tensor, v::SVector{8})
                      # 11,   21,   31,   12,   22,   32,   13,   23,   33
     return Tensor{2,3}((0, v[8], v[7], v[5], v[1], v[6], v[4], v[3], v[2]))
 end
@@ -272,8 +318,8 @@ end
 # -SymmetricTensor
 #         i:  1,  2,  3
 # v contains 33, 23, 13
-function get_full_tensor(::PlaneStress, ::SymmetricTensor, v::SVector{3})
-    s = 1/√2           # 11,21,   31,  22,   32,     33
+function get_full_tensor(::PlaneStress, ::SymmetricTensor, v::SVector{3,T}) where T
+    s = T(1/√2)        # 11,21,   31,  22,   32,     33
     SymmetricTensor{2,3}((0, 0, v[3]*s, 0, v[2]*s, v[1]))
 end
 function get_unknowns(::PlaneStress, a::SymmetricTensor{2,3})
@@ -288,7 +334,7 @@ end
 # -Tensor
 #         i:  1,  2,  3,  4,  5,  6
 # v contains 33, 23, 13, 32, 31
-function get_full_tensor(::PlaneStress, ϵ::Tensor, v::SVector{5,T}) where T
+function get_full_tensor(::PlaneStress, ϵ::Tensor, v::SVector{5})
                      # 11,21,   31,12,22,   32,   13,   23,   33
     return Tensor{2,3}((0, 0, v[5], 0, 0, v[4], v[3], v[2], v[1]))
 end
@@ -327,22 +373,22 @@ end
 
 # GeneralStressState
 function get_full_tensor(state::GeneralStressState{Nσ}, ::TT, v::SVector{Nσ,T}) where {Nσ,T,TT}
-    shear_factor = 1/√2
-    s(i,j) = i==j ? 1.0 : shear_factor
+    shear_factor = T(1/√2)
+    s(i,j) = i==j ? one(T) : shear_factor
     f(i,j) = state.σ_ctrl[i,j] ? v[state.σ_minds[i,j]]*s(i,j) : zero(T)
     return Tensors.get_base(TT)(f)
 end
 
-function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3}) where Nσ
-    shear_factor = √2
-    s(i,j) = i==j ? 1.0 : shear_factor
-    f(c) = ((i,j) = c; a[i,j]*s(i,j)-state.σ[i,j])
+function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}) where {Nσ, T}
+    shear_factor = T(√2)
+    s(i,j) = i==j ? one(T) : shear_factor
+    f(c) = ((i,j) = c; s(i,j)*(a[i,j]-state.σ[i,j]))
     return SVector{Nσ}((f(c) for c in state.σm_inds))
 end
 
-function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{4,3}) where Nσ
-    shear_factor = √2
-    s(i,j) = i==j ? 1.0 : shear_factor
+function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{4,3,T}) where {Nσ,T}
+    shear_factor = T(√2)
+    s(i,j) = i==j ? one(T) : shear_factor
     f(c1,c2) = ((i,j) = c1; (k,l) = c2; a[i,j,k,l]*s(i,j)*s(k,l))
     return SMatrix{Nσ,Nσ}((f(c1,c2) for c1 in state.σm_inds, c2 in state.σm_inds))
 end

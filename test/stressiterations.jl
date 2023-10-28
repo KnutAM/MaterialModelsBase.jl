@@ -34,7 +34,7 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
 
 function run_timehistory(s::MMB.AbstractStressState, m::AbstractMaterial, ϵv::Vector{<:AbstractTensor}, t = collect(range(0,1;length=length(ϵ))))
     state = initial_material_state(m)
-    cache = get_cache(m)
+    cache = allocate_material_cache(m)
     σv = eltype(ϵv)[]
     ϵv_full = tensortype(first(ϵv))[]
     local dσdϵ
@@ -53,7 +53,7 @@ end
     for stress_state in all_states
         for TT in (Tensor, SymmetricTensor)
             ared = rand(TT{2,_getdim(stress_state)})
-            afull = MMB.get_full_tensor(stress_state, ared)
+            afull = MMB.expand_tensordim(stress_state, ared)
             @test _getdim(afull) == 3    # Full dimensional tensor
             @test norm(ared) ≈ norm(afull)    # Only add zeros
             # Test invertability of conversions
@@ -111,7 +111,7 @@ end
     @test dσdϵ[1,1,1,1] ≈ E 
     @test ϵfull[2,2] ≈ ϵfull[3,3]
     @test ϵfull[2,2] ≈ -ν*Δϵ
-    gen = MMB.GeneralStressState(UniaxialStress(), SymmetricTensor{2,3})
+    gen = GeneralStressState(UniaxialStress(), SymmetricTensor{2,3})
     ϵfull_ = SymmetricTensor{2,3}((i,j)->i==j==1 ? Δϵ : rand())
     σ_, dσdϵ_ = material_response(gen, m, ϵfull_, old)
     @test σ_[1,1] ≈ σ[1,1]
@@ -123,6 +123,18 @@ end
     σ_full, dσdϵ_full, _ = material_response(m, ϵfull, old, 0.0)
     @test σ_full[2,2] ≈ λ*Δϵ
 
+    # UniaxialNormalStress
+    ϵ11_value = rand()
+    ϵ11 = SymmetricTensor{2,1}((ϵ11_value,))
+    ϵ = SymmetricTensor{2,3}((i,j)-> i==j==1 ? ϵ11_value : 0.0)
+    σ1, dσdϵ1, _, ϵfull1 = material_response(UniaxialStress(), m, ϵ11, old, 0.0)
+    σ2, dσdϵ2, _, ϵfull2 = material_response(UniaxialStrain(), m, ϵ11, old, 0.0)
+    σ3, dσdϵ3, _, ϵfull3 = material_response(UniaxialNormalStress(), m, ϵ, old, 0.0)
+    @test σ1[1,1] ≈ σ3[1,1]
+    @test abs(σ3[2,2]) < 1e-8 
+    @test abs(σ3[3,3]) < 1e-8
+    @test dσdϵ3[1,1,1,1] ≈ dσdϵ2[1,1,1,1]
+
     # PlaneStress
     ϵ = rand(SymmetricTensor{2,2})
     σ, dσdϵ, state, ϵfull = material_response(PlaneStress(), m, ϵ, old, 0.0)
@@ -131,7 +143,7 @@ end
     @test σ ≈ dσdϵ⊡ϵ
     σ_full, dσdϵ_full, _ = material_response(m, ϵfull, old, 0.0)
     @test σ_full[1:2,1:2] ≈ σ
-    gen = MMB.GeneralStressState(PlaneStress(), SymmetricTensor{2,3})
+    gen = GeneralStressState(PlaneStress(), SymmetricTensor{2,3})
     ϵfull_ = SymmetricTensor{2,3}((i,j)->(i<3 && j<3) ? ϵ[i,j] : rand())
     σ_, dσdϵ_ = material_response(gen, m, ϵfull_, old)
     @test σ_[1:2,1:2] ≈ σ
@@ -145,7 +157,19 @@ end
     σ_full, dσdϵ_full, _ = material_response(m, ϵfull, old, 0.0)
     @test σ_full[1:2,1:2] ≈ σ 
 
+    # - Non-zero stress conditions taken from PlaneStrain above
+    gen = GeneralStressState(PlaneStress(), SymmetricTensor{2,3})
+    update_stress_state!(gen, σ_full)
+    σ_gen, dσdϵ_gen, _, ϵfull_gen = material_response(gen, m, ϵ, old, 0.0)
+    @test σ_gen[1:2, 1:2] ≈ σ
+    @test σ_gen ≈ σ_full
+    @test ϵfull_gen ≈ ϵfull
+    # The 3d material stiffness is given, so this should match the plane strain output
+    @test dσdϵ_gen[1:2, 1:2, 1:2, 1:2] ≈ dσdϵ
+
     # Stress state wrapper
+    ϵ = rand(SymmetricTensor{2,2})
+    σ, dσdϵ, state, ϵfull = material_response(PlaneStrain(), m, ϵ, old, 0.0)
     σ_w, dσdϵ_w, state_w, ϵfull_w = material_response(ReducedStressState(PlaneStrain(), m), ϵ, old, 0.0)
     @test σ_w == σ
     @test dσdϵ_w == dσdϵ
@@ -173,6 +197,6 @@ end
     # Test ReducedStressState wrapper 
     w = ReducedStressState(stress_state, material)
     @test initial_material_state(material) == initial_material_state(w)
-    @test get_cache(material) == get_cache(w)
+    @test allocate_material_cache(material) == allocate_material_cache(w)
 end
 

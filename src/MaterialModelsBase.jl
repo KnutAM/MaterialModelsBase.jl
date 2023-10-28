@@ -1,13 +1,17 @@
 module MaterialModelsBase
 using Tensors, StaticArrays
+import Base: @kwdef
 
-# Standard for all materials
-export material_response, initial_material_state, get_cache                 # Main (mandatory) functions
-export AbstractMaterial                                                     # Material parameters
-export AbstractMaterialState, NoMaterialState                               # State
-export AbstractMaterialCache, NoMaterialCache                               # Cache
-export AbstractExtraOutput, NoExtraOutput                                   # Extra output
-export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    # Exceptions
+# General interface for <:AbstractMaterial
+export AbstractMaterial                                 # Material parameters
+export material_response                                # Main (mandatory) functions
+export initial_material_state, allocate_material_cache  # Optional, but common functions to define
+export AbstractMaterialState, NoMaterialState           # State
+export AbstractMaterialCache, NoMaterialCache           # Cache
+export AbstractExtraOutput,   NoExtraOutput             # Extra output
+
+# Exceptions
+export MaterialConvergenceError, NoLocalConvergence, NoStressConvergence    
 
 # Stress state iterations
 export AbstractStressState
@@ -19,11 +23,9 @@ export update_stress_state!                                 # For nonzero stress
 
 # For parameter identification and differentiation of materials
 export material2vector, material2vector!, vector2material                   # Convert to/from parameter vector
-export getnumtensorcomponents, getnumstatevars, getnumparams                # Information about the specific material 
+export get_num_tensorcomponents, get_num_statevars, get_num_params                # Information about the specific material 
 export MaterialDerivatives, differentiate_material!                         # Differentiation routines
 export allocate_differentiation_output
-
-
 
 abstract type AbstractMaterial end
 
@@ -34,9 +36,8 @@ abstract type AbstractMaterial end
         strain::Union{SecondOrderTensor,Vec}, 
         old::AbstractMaterialState, 
         Δt::Union{Number,Nothing}=nothing, 
-        cache::AbstractMaterialCache=get_cache(m), 
-        extras::AbstractExtraOutput=NoExtraOutput(); 
-        options::Dict=Dict{Symbol}()
+        cache::AbstractMaterialCache=allocate_material_cache(m), 
+        extras::AbstractExtraOutput=NoExtraOutput()
         )
 
 Calculate the stress/traction, stiffness and updated state variables 
@@ -58,13 +59,9 @@ for the material `m`, given the strain input `strain`.
 - `Δt`: The time step in the current increment. Defaults to `nothing`. 
 - `cache::AbstractMaterialCache`: Cache variables that can be used to avoid
   allocations during each call to the `material_response` function. 
-  This can be created by the [`get_cache`](@ref) function.
+  This can be created by the [`allocate_material_cache`](@ref) function.
 - `extras`: Updated with requested extra output. 
   Defaults to the empty struct `NoExtraOutput`
-
-# Optional keyword arguments
-- `options`: Additional options that may be specific for each material. 
-  This is also used for stress iterations, see [Stress states](@ref).
 
 # Outputs
 1) `stress`, is the stress measure that is energy conjugated to the `strain` (2nd) input.
@@ -103,14 +100,14 @@ struct NoMaterialState <: AbstractMaterialState end
 
 # Material cache 
 """
-    get_cache(m::AbstractMaterial)
+    allocate_material_cache(m::AbstractMaterial)
 
 Return a `cache::AbstractMaterialCache` that can be used when 
 calling the material to reduce allocations
 
 Defaults to the empty `NoMaterialCache()`
 """
-function get_cache(::AbstractMaterial) 
+function allocate_material_cache(::AbstractMaterial) 
     return NoMaterialCache()
 end
 
@@ -134,33 +131,6 @@ struct NoExtraOutput <: AbstractExtraOutput end
 
 include("differentiation.jl")
 include("stressiterations.jl")
-
-# Convergence errors
-"""
-    MaterialConvergenceError
-
-Can be used to catch errors related to the material not converging. 
-"""
-abstract type MaterialConvergenceError <: Exception end
-#The following is only needed if additional formatting is desired:
-#Base.showerror(io::IO, e::MaterialConvergenceError) = println(io, e.msg)
-
-"""
-    NoLocalConvergence(msg::String)
-
-Throw if the material_response routine doesn't converge internally
-"""
-struct NoLocalConvergence <: MaterialConvergenceError
-    msg::String
-end
-
-"""
-    NoStressConvergence(msg::String)
-
-This is thrown if the stress iterations don't converge, see [Stress states](@ref)
-"""
-struct NoStressConvergence <: MaterialConvergenceError
-    msg::String
-end
+include("ErrorExceptions.jl")
 
 end

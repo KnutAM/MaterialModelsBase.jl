@@ -28,7 +28,7 @@ If we would write a material point simulator, we also need to instantiate the ma
 and optionally the cache. 
 ```julia
 state = initial_material_state(material)
-cache = get_cache(material)
+cache = allocate_material_cache(material)
 ```
 
 Now, we can loop through the time history, let's say we want to simulate the uniaxial stress case:
@@ -83,7 +83,7 @@ initial_material_state
 ```
 
 ```@docs
-get_cache
+allocate_material_cache
 ```
 
 ```@docs

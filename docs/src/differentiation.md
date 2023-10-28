@@ -1,9 +1,9 @@
 # Differentation of a material
 
 ```@docs
-getnumtensorcomponents
-getnumstatevars
-getnumparams
+get_num_tensorcomponents
+get_num_statevars
+get_num_params
 ```
 
 ```@docs

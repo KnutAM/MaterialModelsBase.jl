@@ -1,6 +1,6 @@
 
 """
-    getnumtensorcomponents(::AbstractMaterial)
+    get_num_tensorcomponents(::AbstractMaterial)
 
 Returns the number of independent components for the given material. 
 - If the material works with the small strain tensor and Cauchy stress, return 6 (default)
@@ -9,26 +9,26 @@ Returns the number of independent components for the given material.
 
 Defaults to 6 if not overloaded
 """
-getnumtensorcomponents(::AbstractMaterial) = 6 # Default to small strain version
+get_num_tensorcomponents(::AbstractMaterial) = 6 # Default to small strain version
 
 """
-    getnumstatevars(m::AbstractMaterial)
+    get_num_statevars(m::AbstractMaterial)
 
 Return the number of state variables.
 A tensorial state variable should be counted by how many components it has. 
 E.g. if a state consists of one scalar and one symmetric 2nd order tensor,
-`getnumstatevars` should return 7 (if the space dimension is 3).
+`get_num_statevars` should return 7 (if the space dimension is 3).
 
 Defaults to 0 if not overloaded
 """
-getnumstatevars(::AbstractMaterial) = 0
+get_num_statevars(::AbstractMaterial) = 0
 
 """
-    getnumparams(m::AbstractMaterial)
+    get_num_params(m::AbstractMaterial)
 
 Return the number of material parameters in `m`. No default value implemented. 
 """
-function getnumparams end
+function get_num_params end
 
 # Conversion to vectors of parameters
 """
@@ -46,10 +46,10 @@ function vector2material end
 
 """
     material2vector(m::AbstractMaterial)
-Out-of place version of `material2vector!`. Given `getnumparams`, this function
+Out-of place version of `material2vector!`. Given `get_num_params`, this function
 does not need to be overloaded unless another datatype than Float64 should be used.
 """
-material2vector(m::AbstractMaterial) = material2vector!(zeros(getnumparams(m)), m)
+material2vector(m::AbstractMaterial) = material2vector!(zeros(get_num_params(m)), m)
 
 struct MaterialDerivatives{T}
     dσdϵ::Matrix{T}
@@ -64,13 +64,13 @@ end
     MaterialDerivatives(m::AbstractMaterial, T=Float64)
 
 A struct that saves all derivative information using a `Matrix{T}` for each derivative.
-If `getnumtensorcomponents`, `getnumstatevars`, and `getnumparams` are implemented for `m`,
+If `get_num_tensorcomponents`, `get_num_statevars`, and `get_num_params` are implemented for `m`,
 `MaterialDerivatives` does not need to be overloaded for `m`. 
 """
 function MaterialDerivatives(m::AbstractMaterial, T=Float64)
-    n_tensor = getnumtensorcomponents(m)
-    n_state = getnumstatevars(m)
-    n_params = getnumparams(m)
+    n_tensor = get_num_tensorcomponents(m)
+    n_state = get_num_statevars(m)
+    n_params = get_num_params(m)
     return MaterialDerivatives(
         zeros(T, n_tensor, n_tensor),  # dσdϵ
         zeros(T, n_tensor, n_state),   # dσdⁿs

@@ -22,16 +22,16 @@ export GeneralStressState                                   # General iterative 
 export update_stress_state!                                 # For nonzero stress-conditions
 
 # For parameter identification and differentiation of materials
-export material2vector, material2vector!, vector2material                   # Convert to/from parameter vector
-export get_num_tensorcomponents, get_num_statevars, get_num_params                # Information about the specific material 
-export MaterialDerivatives, differentiate_material!                         # Differentiation routines
-export allocate_differentiation_output
+export material2vector, material2vector!, vector2material   # Convert to/from parameter vector
+export get_num_tensorcomponents, get_num_statevars          # Information about the specific material
+export get_num_params, get_parameter_type                   # 
+export MaterialDerivatives, differentiate_material!         # Differentiation routines
+export allocate_differentiation_output                      # 
 
 abstract type AbstractMaterial end
 
 """
     material_response(
-        [stress_state::AbstractStressState],
         m::AbstractMaterial, 
         strain::Union{SecondOrderTensor,Vec}, 
         old::AbstractMaterialState, 
@@ -54,33 +54,54 @@ for the material `m`, given the strain input `strain`.
    the [`initial_material_state`](@ref) function.
 
 # Optional positional arguments
-- `stress_state`: Use to solve for a reduced stress state, e.g. PlaneStress. 
-   See [Stress states](@ref).
-- `Δt`: The time step in the current increment. Defaults to `nothing`. 
+When calling the function, the following arguments are optional. 
+When implementing a material, it is not necessary to implement these 
+defaults, but the method signature should contain all arguments to be 
+compatible with libraries relying on the interface.
+
+- `Δt`: The time step in the current increment. 
+  Defaults: `nothing`.
 - `cache::AbstractMaterialCache`: Cache variables that can be used to avoid
   allocations during each call to the `material_response` function. 
-  This can be created by the [`allocate_material_cache`](@ref) function.
+  Default: [`allocate_material_cache(m)`](@ref allocate_material_cache)
 - `extras`: Updated with requested extra output. 
-  Defaults to the empty struct `NoExtraOutput`
+  Default: `NoExtraOutput` (Empty struct)
 
 # Outputs
 1) `stress`, is the stress measure that is energy conjugated to the `strain` (2nd) input.
 2) `stiffness`, is the derivative of the `stress` output wrt. the `strain` input. 
 3) `new_state`, are the updated state variables
-4) `strain`, is only available if `stress_state` is given and returns the full strain tensor
 
-The following are probably the three most common `strain` and `stress` pairs:
-- If the second input is the deformation gradient ``\\boldsymbol{F}`` (`F::Tensor{2}`)`, the outputs are
-    - `P::Tensor{2}`: First Piola-Kirchhoff stress, ``\\boldsymbol{P}``
-    - `dPdF::Tensor{4}`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{P}/\\mathrm{d}\\boldsymbol{F}``
+!!! note
+
+    The `state` given as input should not be mutated. That is, someone calling 
+    `material_response` multiple times with the same input variables should get 
+    the same output each time.
+
+Common `strain` and `stress` pairs are
 - If the second input is the small strain tensor, ``\\boldsymbol{\\epsilon}`` (`ϵ::SymmetricTensor{2}`), the outputs are
     - `σ::SymmetricTensor{2}`: Cauchy stress tensor, ``\\boldsymbol{\\sigma}``
     - `dσdϵ::SymmetricTensor{4}`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{\\sigma}/\\mathrm{d}\\boldsymbol{\\epsilon}``
+- If the second input is the deformation gradient ``\\boldsymbol{F}`` (`F::Tensor{2}`)`, the outputs are
+    - `P::Tensor{2}`: First Piola-Kirchhoff stress, ``\\boldsymbol{P}``
+    - `dPdF::Tensor{4}`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{P}/\\mathrm{d}\\boldsymbol{F}``
 - If the second input is deformation vector, ``\\boldsymbol{u}`` (`u::Vec`), the outputs are
     - `t::Vec`: Traction vector, ``\\boldsymbol{t}``
     - `dtdu::SecondOrderTensor`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{t}/\\mathrm{d}\\boldsymbol{u}``
 """
-function material_response end
+function material_response(m::AbstractMaterial, strain, old, Δt, cache)
+    return material_response(m::AbstractMaterial, strain, old, Δt, cache, NoExtraOutput())
+end
+
+# Using separate definition instead of default args prevent method ambiguities and risk of 
+# stack-overflow if the material hasn't been implemented.
+function material_response(m::AbstractMaterial, strain, old, Δt)
+    return material_response(m::AbstractMaterial, strain, old, Δt, allocate_material_cache(m))
+end
+
+function material_response(m::AbstractMaterial, strain, old)
+    return material_response(m::AbstractMaterial, strain, old, nothing)
+end
 
 # Initial material state
 """

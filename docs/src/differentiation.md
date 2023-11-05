@@ -4,6 +4,7 @@
 get_num_tensorcomponents
 get_num_statevars
 get_num_params
+get_parameter_type
 ```
 
 ```@docs

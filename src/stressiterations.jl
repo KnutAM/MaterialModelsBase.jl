@@ -1,5 +1,31 @@
 abstract type AbstractStressState end
 
+"""
+    material_response(stress_state::AbstractStressState, m::AbstractMaterial, args...)
+
+To be able to use material models implemented for 3d stress and strain states in lower-dimensional 
+simulations, such as 2d plane stress, `MaterialModelsBase.jl` provides a set of stress states. 
+For some states, such as plane stress, iterations will be performed to find the correct state.
+For other states, such as plane strain, the input is only padded with zeros and the out-of-plane 
+components are removed from the output. 
+
+For someone implementing a material model, it is also possible to use dispatch on both the 
+stress state and the material to provide an efficient implementation of a reduced stress state.
+Note that the interface expects the full strain tensor to be given as a fourth output in this case,
+but it is optional to implement this but such a deviation should be documented as it could cause 
+problems for users of the material implementation. 
+
+The arguments are the same as for `material_response(::AbstractMaterial)`.
+However, both a full and reduced strain input is accepted. For a full strain input, 
+the out-of-plane components are used as an initial guess. For all cases, 
+the full strain tensor giving the desired reduced response is given as a 4th output.
+
+See also [`ReducedStressState`](@ref).
+"""
+function material_response(stress_state::AbstractStressState, m::AbstractMaterial, args...)
+    return reduced_material_response(stress_state, m, args...)
+end
+
 update_stress_state!(::AbstractStressState, σ) = nothing
 
 """
@@ -8,16 +34,30 @@ update_stress_state!(::AbstractStressState, σ) = nothing
 Creates a subtype of `AbstractMaterial` that wraps a stress state and a material, such that 
 calls to `material_response(w::ReducedStressState, args...)` gives the same result as 
 `material_response(s, m, args...)`. 
-Calls to `initial_material_state` and `allocate_material_cache` are forwarded with `m` as the argument. 
+Calls to `initial_material_state`, `allocate_material_cache`, 
+`get_num_tensorcomponents`, `get_num_statevars`, `get_num_params`, 
+`get_parameter_type`, `material2vector!`, `material2vector`, 
+and `allocate_differentiation_output` are forwarded with `m` as the argument. 
+`vector2material` returns `ReducedStressState` and is supported as well.
 """
 struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: AbstractMaterial
     stress_state::S
     material::M
 end
-initial_material_state(rss::ReducedStressState) = initial_material_state(rss.material)
-allocate_material_cache(rss::ReducedStressState) = allocate_material_cache(rss.material)
-function material_response(rss::ReducedStressState, args...; kwargs...)
-    return material_response(rss.stress_state, rss.material, args...; kwargs...)
+for op in ( :initial_material_state, :allocate_material_cache, 
+            :get_num_tensorcomponents, :get_num_statevars, :get_num_params, 
+            :get_parameter_type, :allocate_differentiation_output)
+    @eval @inline $op(rss::ReducedStressState) = $op(rss.material)
+end
+function material2vector!(v::AbstractVector, rss::ReducedStressState)
+    return material2vector!(v, rss.material)
+end
+function vector2material(v::AbstractVector, rss::ReducedStressState)
+    return ReducedStressState(rss.stress_state, vector2material(v, rss.material))
+end
+
+function material_response(rss::ReducedStressState, args...)
+    return material_response(rss.stress_state, rss.material, args...)
 end
 
 # Cases without stress iterations
@@ -209,28 +249,17 @@ reduce_tensordim(::Val{dim}, A::Tensor{4}) where dim = Tensor{4,dim}((i,j,k,l)->
 reduce_tensordim(::Val{dim}, a::SymmetricTensor{2}) where dim = SymmetricTensor{2,dim}((i,j)->a[i,j])
 reduce_tensordim(::Val{dim}, A::SymmetricTensor{4}) where dim = SymmetricTensor{4,dim}((i,j,k,l)->A[i,j,k,l])
 
-function material_response(stress_state::AbstractStressState, m::AbstractMaterial, args...; kwargs...)
-    return reduced_material_response(stress_state, m, args...; kwargs...)
-end
 
-function reduced_material_response(
-    stress_state::NoIterationState,
-    m::AbstractMaterial,
-    ϵ::AbstractTensor,
-    args...; kwargs...
-    )
+function reduced_material_response(stress_state::NoIterationState, 
+        m::AbstractMaterial, ϵ::AbstractTensor, args...)
 
     ϵ_full = expand_tensordim(stress_state, ϵ)
-    σ, dσdϵ, new_state = material_response(m, ϵ_full, args...; kwargs...)
+    σ, dσdϵ, new_state = material_response(m, ϵ_full, args...)
     return reduce_tensordim(stress_state, σ), reduce_tensordim(stress_state, dσdϵ), new_state, ϵ_full
 end
 
-function reduced_material_response(
-    stress_state::IterationState,
-    m::AbstractMaterial,
-    ϵ::AbstractTensor,
-    args...; kwargs...
-    )
+function reduced_material_response(stress_state::IterationState, 
+        m::AbstractMaterial, ϵ::AbstractTensor, args...)
 
     # Newton options
     tol = get_tolerance(stress_state)
@@ -239,7 +268,7 @@ function reduced_material_response(
     ϵ_full = expand_tensordim(stress_state, ϵ)
 
     for _ in 1:maxiter
-        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...; kwargs...)
+        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...)
         σ_mandel = get_unknowns(stress_state, σ_full)
 
         if norm(σ_mandel) < tol

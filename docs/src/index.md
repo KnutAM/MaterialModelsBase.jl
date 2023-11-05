@@ -40,15 +40,15 @@ To use this function, we need to define the material parameters for an
 implemented material model in `TestMaterials`, for example
 ```julia
 using TestMaterials
-G1=80.e3; G2=8.e3; K1=160.e3; K2=16.e3; η=1000.0
+G1=50.e3; G2=80.e3; K1=100.e3; K2=160.e3; η=50e3;
 material = ViscoElastic(LinearElastic(G1,K1), LinearElastic(G2,K2), η)
 ```
 
 And then we can run the simulation
 ```julia
-ϵ11_history  = collect(range(0, 0.01; length=100))   # Ramp to 1 %
-time_history = collect(range(0, 1.00; length=100))   # Constant time step
-σ11_history = simulate_uniaxial(material, ϵ11_history, time_history)
+ϵ11_history  = collect(range(0, 0.01; length=100))  # Ramp to 1 %
+time_history = collect(range(0, 0.2; length=100))   # Constant time step
+σ11_history  = simulate_uniaxial(material, ϵ11_history, time_history)
 ```
 
 This example used the stress iterations implemented in `MaterialModelsBase.jl`,

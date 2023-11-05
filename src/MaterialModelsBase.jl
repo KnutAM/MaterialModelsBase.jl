@@ -56,8 +56,10 @@ for the material `m`, given the strain input `strain`.
 # Optional positional arguments
 When calling the function, the following arguments are optional. 
 When implementing a material, it is not necessary to implement these 
-defaults, but the method signature should contain all arguments to be 
-compatible with libraries relying on the interface.
+defaults, but the method signature should allow all arguments to be 
+compatible with libraries relying on the interface. 
+Typically, this can done by using `args...`, e.g., 
+`material_response(m::MyMat, ϵ, state, args...)`
 
 - `Δt`: The time step in the current increment. 
   Defaults: `nothing`.

@@ -22,13 +22,8 @@ function get_stiffness(m::LinearElastic)
 end
 
 function MMB.material_response(
-    m::LinearElastic, 
-    ϵ::SymmetricTensor{2},
-    old::NoMaterialState=NoMaterialState(), 
-    Δt=nothing, 
-    ::NoMaterialCache=allocate_material_cache(m), 
-    ::NoExtraOutput=NoExtraOutput())
-
+        m::LinearElastic, ϵ::SymmetricTensor{2},
+        old::NoMaterialState=NoMaterialState(), args...)
     dσdϵ = get_stiffness(m)
     σ = dσdϵ⊡ϵ
     return σ, dσdϵ, old
@@ -68,19 +63,21 @@ MMB.initial_material_state(::ViscoElastic) = ViscoElasticState(zero(SymmetricTen
 function get_stress_ϵv(m::ViscoElastic, ϵ::SymmetricTensor{2,3}, old::ViscoElasticState, Δt)
     E1 = get_stiffness(m.E1)
     E2 = get_stiffness(m.E2)
-    ϵv = inv(Δt*E2+one(E2)*m.η)⊡(Δt*E2⊡ϵ + m.η*old.ϵv)
+    ϵv = inv(Δt*E2+one(E2)*m.η)⊡(Δt*E2⊡dev(ϵ) + m.η*old.ϵv)
     σ = E1⊡ϵ + m.η*(ϵv-old.ϵv)/Δt
     return σ, ϵv
 end
 
 function MMB.material_response(
-        m::ViscoElastic, 
-        ϵ::SymmetricTensor{2},
-        old::ViscoElasticState, 
-        Δt, # Time step required
-        ::NoMaterialCache=allocate_material_cache(m), 
-        ::NoExtraOutput=NoExtraOutput())
-
+        m::ViscoElastic, ϵ::SymmetricTensor{2},
+        old::ViscoElasticState, Δt, args...)
+    if Δt == zero(Δt)
+        if norm(ϵ) ≈ 0
+            return zero(ϵ), NaN*zero(get_stiffness(m.E1)), old
+        else
+            throw(NoLocalConvergence("Δt=0 is not allowed for non-zero strain"))
+        end
+    end
     σ, ϵv = get_stress_ϵv(m,ϵ,old,Δt)
     dσdϵ = gradient(ϵ_->get_stress_ϵv(m,ϵ_,old,Δt)[1], ϵ)
     return σ, dσdϵ, ViscoElasticState(ϵv)

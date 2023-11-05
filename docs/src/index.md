@@ -92,7 +92,7 @@ Two variants can be called, where the latter allows a reduced
 stress state, see [Stress States](@ref Stress-states) for further details. 
 ```@docs
 material_response(::AbstractMaterial, ::Any, ::Any, ::Any, ::Any)
-material_response(::AbstractStressState, ::AbstractMaterial)
+material_response(::AbstractStressState, ::AbstractMaterial, ::Vararg{Any})
 ```
 
 ### State variables

@@ -23,7 +23,8 @@ end
 
 function MMB.material_response(
         m::LinearElastic, ϵ::SymmetricTensor{2},
-        old::NoMaterialState=NoMaterialState(), args...)
+        old::NoMaterialState, 
+        Δt, cache, extras) # Explicit values added to test the defaults
     dσdϵ = get_stiffness(m)
     σ = dσdϵ⊡ϵ
     return σ, dσdϵ, old

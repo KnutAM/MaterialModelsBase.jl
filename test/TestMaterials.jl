@@ -48,7 +48,8 @@ function MMB.differentiate_material!(
     ForwardDiff.jacobian!(diff.dσdp, σ_from_p, material2vector(m))
 end
 
-# ViscoElastic material (decide model)
+# ViscoElastic material: Note - not physically reasonable model because 
+# the volumetric response is also viscous
 struct ViscoElastic{T} <: AbstractMaterial
     E1::LinearElastic{T}
     E2::LinearElastic{T}
@@ -63,7 +64,7 @@ MMB.initial_material_state(::ViscoElastic) = ViscoElasticState(zero(SymmetricTen
 function get_stress_ϵv(m::ViscoElastic, ϵ::SymmetricTensor{2,3}, old::ViscoElasticState, Δt)
     E1 = get_stiffness(m.E1)
     E2 = get_stiffness(m.E2)
-    ϵv = inv(Δt*E2+one(E2)*m.η)⊡(Δt*E2⊡dev(ϵ) + m.η*old.ϵv)
+    ϵv = inv(Δt*E2+one(E2)*m.η)⊡(Δt*E2⊡ϵ + m.η*old.ϵv)
     σ = E1⊡ϵ + m.η*(ϵv-old.ϵv)/Δt
     return σ, ϵv
 end

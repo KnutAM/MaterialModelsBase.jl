@@ -92,17 +92,17 @@ Common `strain` and `stress` pairs are
     - `dtdu::SecondOrderTensor`: Algorithmic tangent stiffness tensor, ``\\mathrm{d}\\boldsymbol{t}/\\mathrm{d}\\boldsymbol{u}``
 """
 function material_response(m::AbstractMaterial, strain, old, Δt, cache)
-    return material_response(m::AbstractMaterial, strain, old, Δt, cache, NoExtraOutput())
+    return material_response(m, strain, old, Δt, cache, NoExtraOutput())
 end
 
 # Using separate definition instead of default args prevent method ambiguities and risk of 
 # stack-overflow if the material hasn't been implemented.
 function material_response(m::AbstractMaterial, strain, old, Δt)
-    return material_response(m::AbstractMaterial, strain, old, Δt, allocate_material_cache(m))
+    return material_response(m, strain, old, Δt, allocate_material_cache(m))
 end
 
 function material_response(m::AbstractMaterial, strain, old)
-    return material_response(m::AbstractMaterial, strain, old, nothing)
+    return material_response(m, strain, old, nothing)
 end
 
 # Initial material state

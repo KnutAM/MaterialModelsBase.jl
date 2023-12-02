@@ -259,7 +259,7 @@ function reduced_material_response(stress_state::NoIterationState,
 end
 
 function reduced_material_response(stress_state::IterationState, 
-        m::AbstractMaterial, ϵ::AbstractTensor, args...)
+        m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where N
 
     # Newton options
     tol = get_tolerance(stress_state)

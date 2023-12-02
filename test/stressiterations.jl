@@ -1,28 +1,3 @@
-_getdim(::MaterialModelsBase.State1D) = 1
-_getdim(::MaterialModelsBase.State2D) = 2
-_getdim(::MaterialModelsBase.State3D) = 3
-_getdim(::AbstractTensor{order,dim}) where {order,dim} = dim
-
-tensortype(::SymmetricTensor) = SymmetricTensor
-tensortype(::Tensor) = Tensor
-
-# Create GeneralStressState from regular states to check compatibility
-function MMB.GeneralStressState(::UniaxialStress, TT::Type{<:SecondOrderTensor{3}})
-    σ = zero(TT)
-    σ_ctrl = tensortype(σ){2,3,Bool}((i,j)->!(i==j==1))
-    return MMB.GeneralStressState(σ_ctrl, σ)
-end
-function MMB.GeneralStressState(::PlaneStress, TT::Type{<:SecondOrderTensor{3}})
-    σ = zero(TT)
-    σ_ctrl = tensortype(σ){2,3,Bool}((i,j)->(i==3 || j==3))
-    return MMB.GeneralStressState(σ_ctrl, σ)
-end
-function MMB.GeneralStressState(::UniaxialNormalStress, TT::Type{<:SecondOrderTensor{3}})
-    σ = zero(TT)
-    σ_ctrl = tensortype(σ){2,3,Bool}((i,j)->(i==j∈(2,3)))
-    return MMB.GeneralStressState(σ_ctrl, σ)
-end
-
 all_states = (
     FullStressState(), UniaxialStrain(), PlaneStrain(),
     UniaxialStress(), PlaneStress(), UniaxialNormalStress())
@@ -31,20 +6,6 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
                 ([3,4,5,7,8], [3,4,5]),
                 ([2,3], [2,3]))
 
-
-function run_timehistory(s::MMB.AbstractStressState, m::AbstractMaterial, ϵv::Vector{<:AbstractTensor}, t = collect(range(0,1;length=length(ϵ))))
-    state = initial_material_state(m)
-    cache = allocate_material_cache(m)
-    σv = eltype(ϵv)[]
-    ϵv_full = tensortype(first(ϵv))[]
-    local dσdϵ
-    for i in 2:length(ϵv)
-        σ, dσdϵ, state, ϵ_full = material_response(s, m, ϵv[i], state, t[i]-t[i-1], cache)
-        push!(σv, σ)
-        push!(ϵv_full, ϵ_full)
-    end
-    return σv, ϵv_full, dσdϵ
-end
 
 @testset "conversions" begin
     # Test that

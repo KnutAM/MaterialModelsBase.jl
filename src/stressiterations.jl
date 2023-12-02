@@ -259,7 +259,7 @@ function reduced_material_response(stress_state::NoIterationState,
 end
 
 function reduced_material_response(stress_state::IterationState, 
-        m::AbstractMaterial, ϵ::AbstractTensor, state, Δt, cache, extras)
+        m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where N
 
     # Newton options
     tol = get_tolerance(stress_state)
@@ -268,7 +268,7 @@ function reduced_material_response(stress_state::IterationState,
     ϵ_full = expand_tensordim(stress_state, ϵ)
 
     for _ in 1:maxiter
-        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, state, Δt, cache, extras)
+        σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...)
         σ_mandel = get_unknowns(stress_state, σ_full)
 
         if norm(σ_mandel) < tol

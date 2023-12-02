@@ -31,6 +31,7 @@ function simulate_uniaxial(m::AbstractMaterial, ϵ11_history, time_history)
         ϵ = SymmetricTensor{2,1}((ϵ11_history[i],))
         σ, dσdϵ, state = material_response(stress_state, m, ϵ, state, Δt, cache)
         σ11_history[i] = σ[1,1]
+        t_old += Δt
     end
     return σ11_history
 end

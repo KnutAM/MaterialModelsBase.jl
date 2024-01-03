@@ -122,8 +122,8 @@ allocate_differentiation_output(::AbstractMaterial) = NoExtraOutput()
         old::AbstractMaterialState, 
         Δt,
         cache::AbstractMaterialCache
-        dσdϵ::AbstractTensor, 
         extra::AbstractExtraOutput
+        dσdϵ::AbstractTensor, 
         )
 
 Calculate the derivatives and save them in `diff`, see

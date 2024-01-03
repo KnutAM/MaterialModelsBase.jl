@@ -11,7 +11,7 @@
 
     old = NoMaterialState(); Δt = nothing
     cache = NoMaterialCache(); extras = allocate_differentiation_output(m)
-    differentiate_material!(diff, m, ϵ, old, Δt, cache, dσdϵ, extras)
+    differentiate_material!(diff, m, ϵ, old, Δt, cache, extras, dσdϵ)
     @test diff.dσdϵ ≈ tomandel(dσdϵ)
     @test diff.dσdp[:,1] ≈ tomandel(dσdG)
     @test diff.dσdp[:,2] ≈ tomandel(dσdK)

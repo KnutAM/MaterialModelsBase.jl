@@ -251,7 +251,7 @@ reduce_tensordim(::Val{dim}, A::SymmetricTensor{4}) where dim = SymmetricTensor{
 
 
 function reduced_material_response(stress_state::NoIterationState, 
-        m::AbstractMaterial, ϵ::AbstractTensor, ::Vararg{Any,N}) where N
+        m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where N
 
     ϵ_full = expand_tensordim(stress_state, ϵ)
     σ, dσdϵ, new_state = material_response(m, ϵ_full, args...)

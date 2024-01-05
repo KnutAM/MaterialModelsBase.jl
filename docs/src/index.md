@@ -58,9 +58,9 @@ see [Stress States](@ref Stress-states).
 If these do not converge, a [`NoStressConvergence`](@ref) exception is thrown. 
 
 The package also contains the exception [`NoLocalConvergence`](@ref), 
-which shouldbe thrown from inside implemented material routines to signal 
+which should be thrown from inside implemented material routines to signal 
 that something didn't converge and that the caller should consider 
-to e.g. reduce the time step or handel the issue in some other way.
+to e.g. reduce the time step or handle the issue in some other way.
 
 ## Implementing material models
 To implement a material model, at minimum, it is necessary to 
@@ -88,7 +88,7 @@ see [Differentation of a material](@ref).
 
 ### `material_response`
 The main function is the `material_response` function that 
-primarly dispatches on the `AbstractMaterial` input type. 
+primarily dispatches on the `AbstractMaterial` input type. 
 Two variants can be called, where the latter allows a reduced 
 stress state, see [Stress States](@ref Stress-states) for further details. 
 ```@docs

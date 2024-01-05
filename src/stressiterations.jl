@@ -181,7 +181,7 @@ The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """
 mutable struct GeneralStressState{Nσ,TS,TI,TC,T} <: AbstractStressState
     σ::TS
-    # Reduced mandel indicies
+    # Reduced mandel indices
     const σm_inds::NTuple{Nσ,Tuple{Int,Int}}    # tensor -> mandel: m -> (i,j)
     const σ_minds::TI                           # mandel -> tensor: (i,j)->m 
     const σ_ctrl::TC

@@ -21,8 +21,8 @@ of a material model, we can write a function to do that as
 ```julia
 using MaterialModelsBase, Tensors
 function simulate_uniaxial(m::AbstractMaterial, ϵ11_history, time_history)
-    state = initial_material_state(material)
-    cache = allocate_material_cache(material)
+    state = initial_material_state(m)
+    cache = allocate_material_cache(m)
     stress_state = UniaxialStress()
     t_old = 0.0
     σ11_history = similar(ϵ11_history)

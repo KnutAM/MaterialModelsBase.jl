@@ -31,12 +31,12 @@ function MMB.material_response(
 end
 
 MMB.get_num_params(::LinearElastic) = 2
-function MMB.material2vector!(v::Vector, m::LinearElastic)
+function MMB.tovector!(v::Vector, m::LinearElastic)
     v[1] = m.G
     v[2] = m.K
     return v
 end
-MMB.vector2material(v::Vector, ::LinearElastic) = LinearElastic(v[1], v[2])
+MMB.fromvector(v::Vector, ::LinearElastic) = LinearElastic(v[1], v[2])
 
 function MMB.differentiate_material!(
     diff::MaterialDerivatives,
@@ -45,8 +45,8 @@ function MMB.differentiate_material!(
     args...)
     tomandel!(diff.dσdϵ, get_stiffness(m))
 
-    σ_from_p(p::Vector) = tomandel(get_stiffness(vector2material(p, m))⊡ϵ)
-    ForwardDiff.jacobian!(diff.dσdp, σ_from_p, material2vector(m))
+    σ_from_p(p::Vector) = tomandel(get_stiffness(fromvector(p, m))⊡ϵ)
+    ForwardDiff.jacobian!(diff.dσdp, σ_from_p, tovector(m))
 end
 
 # ViscoElastic material: Note - not physically reasonable model because 

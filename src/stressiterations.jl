@@ -22,6 +22,8 @@ the full strain tensor giving the desired reduced response is given as a 4th out
 
 See also [`ReducedStressState`](@ref).
 """
+material_response(::AbstractStressState, ::AbstractMaterial, args...)
+
 @inline function material_response(stress_state::AbstractStressState, m::AbstractMaterial, args::Vararg{Any,N}) where N
     return reduced_material_response(stress_state, m, args...)
 end
@@ -36,9 +38,9 @@ calls to `material_response(w::ReducedStressState, args...)` gives the same resu
 `material_response(s, m, args...)`. 
 Calls to `initial_material_state`, `allocate_material_cache`, 
 `get_num_tensorcomponents`, `get_num_statevars`, `get_num_params`, 
-`get_parameter_type`, `material2vector!`, `material2vector`, 
+`get_params_eltype`, `tovector!`, `tovector`, 
 and `allocate_differentiation_output` are forwarded with `m` as the argument. 
-`vector2material` returns `ReducedStressState` and is supported as well.
+`fromvector` returns `ReducedStressState` and is supported as well.
 """
 struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: AbstractMaterial
     stress_state::S
@@ -46,14 +48,14 @@ struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: Abstrac
 end
 for op in ( :initial_material_state, :allocate_material_cache, 
             :get_num_tensorcomponents, :get_num_statevars, :get_num_params, 
-            :get_parameter_type, :allocate_differentiation_output)
+            :get_params_eltype, :allocate_differentiation_output)
     @eval @inline $op(rss::ReducedStressState) = $op(rss.material)
 end
-function material2vector!(v::AbstractVector, rss::ReducedStressState)
-    return material2vector!(v, rss.material)
+function tovector!(v::AbstractVector, rss::ReducedStressState)
+    return tovector!(v, rss.material)
 end
-function vector2material(v::AbstractVector, rss::ReducedStressState)
-    return ReducedStressState(rss.stress_state, vector2material(v, rss.material))
+function fromvector(v::AbstractVector, rss::ReducedStressState)
+    return ReducedStressState(rss.stress_state, fromvector(v, rss.material))
 end
 
 function material_response(rss::ReducedStressState, args...)

@@ -1,5 +1,14 @@
 using MaterialModelsBase
 using Documenter
+using Markdown
+
+macro includeshow(filepath)
+    :(
+        include($filepath);
+        content = read($filepath, String);
+        Markdown.parse("```julia\n$(content)\n```")
+    )
+end
 
 DocMeta.setdocmeta!(MaterialModelsBase, :DocTestSetup, :(using MaterialModelsBase); recursive=true)
 
@@ -16,7 +25,9 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Stress states" => "stressiterations.md",
-        "Differentiation" => "differentiation.md"
+        "Conversion" => "conversion.md",
+        "Differentiation" => "differentiation.md",
+        "Implementation" => "implementing.md",
     ],
 )
 

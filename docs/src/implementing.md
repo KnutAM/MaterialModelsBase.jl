@@ -1,4 +1,4 @@
-# How to implement an `AbstractMaterial`
+# [How to implement an `AbstractMaterial`](@id basic-implementation)
 In this tutorial, we show how a subtype of `AbstractMaterial` can be implemented,
 specifically we demonstrate the simple case of a viscoelastic material according 
 to the Zener model, illustrated by the following rheological model.
@@ -26,56 +26,19 @@ Where we will save the viscous strain as a state variable.
 
 ## Basic implementation and usage
 In order to define the material, we start by defining a material struct, which subtypes `AbstractMaterial`,
-```@example
-using MaterialModelsBase, Tensors
-
-@kwdef struct Zener{T} <: AbstractMaterial
-    K::T    # Bulk modulus
-    G0::T   # Long-term shear modulus
-    G1::T   # Shear modulus in viscous chain
-    η1::T   # Viscosity in viscous chain
-end
-nothing #hide
-```
-
 ```@example Zener
-using Markdown
-file = "implementation_snippets/zener_example_p1.jl" #hide
-include(file) #hide
-content = read(file, String)
-Markdown.parse(""" 
-\`\`\`julia
-$content
-\`\`\`
-""")
+include("implementation_snippets/includeshow.jl") #hide
+@includeshow "implementation_snippets/zener_example_p1.jl" #hide
 ```
 
 Next, we define the state struct as well as the `initial_material_state` function,
 ```@example Zener
-struct ZenerState{T} <: AbstractMaterialState
-    ϵv::SymmetricTensor{2,3,T,6}
-end
-MaterialModelsBase.initial_material_state(::Zener) = ZenerState(zero(SymmetricTensor{2,3}))
-nothing #hide
+@includeshow "implementation_snippets/zener_example_p2.jl" #hide
 ```
 
 Before we define some helper functions and the `material_response` function,
 ```@example Zener
-function calculate_viscous_strain(m::Zener, ϵ, old::ZenerState, Δt)
-    return (old.ϵv + (Δt * m.G1 / m.η1) * dev(ϵ)) / (1 + Δt * m.G1 / m.η1)
-end
-
-function calculate_stress(m::Zener, ϵ, old::ZenerState, Δt)
-    ϵv = calculate_viscous_strain(m, ϵ, old, Δt)
-    return 3 * m.K * vol(ϵ) + 2 * m.G0 * dev(ϵ) + 2 * m.G1 * (dev(ϵ) - ϵv)
-end
-
-function MaterialModelsBase.material_response(m::Zener, ϵ, old::ZenerState, Δt, cache, extras)
-    dσdϵ, σ = gradient(e -> calculate_stress(m, e, old, Δt), ϵ, :all)
-    ϵv = calculate_viscous_strain(m, ϵ, old, Δt)
-    return σ, dσdϵ, ZenerState(ϵv)
-end
-nothing #hide
+@includeshow "implementation_snippets/zener_example_p3.jl" #hide
 ```
 The main reason for defining the helper functions is to facilitate differentiating the stress 
 wrt. the strain input, and to avoid repeating code implementations.
@@ -89,21 +52,7 @@ to simulate a ramp of $\epsilon_{11}$, followed by a hold time.
 
 We start by defining a function to calculate the uniaxial material response for any material following the `MaterialModelsBase` interface, given a time and strain history vector:
 ```@example Zener
-# TODO: Save and include this to use the same on the first page #hide
-function simulate_uniaxial(m::AbstractMaterial, ϵ11_history, time_history)
-    state = initial_material_state(m)
-    cache = allocate_material_cache(m)
-    stress_state = UniaxialStress()
-    σ11_history = zero(ϵ11_history)
-    for i in eachindex(ϵ11_history, time_history)[2:end]
-        Δt = time_history[i] - time_history[i-1]
-        ϵ = SymmetricTensor{2,1}((ϵ11_history[i],))
-        σ, dσdϵ, state = material_response(stress_state, m, ϵ, state, Δt, cache)
-        σ11_history[i] = σ[1,1]
-    end
-    return σ11_history
-end
-nothing #hide
+@includeshow "implementation_snippets/simulate_uniaxial.jl" #hide
 ```
 Next, we define the material properties and load case
 ```@example Zener

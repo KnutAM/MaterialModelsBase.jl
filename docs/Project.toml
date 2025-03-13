@@ -1,3 +1,5 @@
 [deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 MaterialModelsBase = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
+Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"

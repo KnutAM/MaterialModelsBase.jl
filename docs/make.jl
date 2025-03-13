@@ -16,7 +16,9 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Stress states" => "stressiterations.md",
-        "Differentiation" => "differentiation.md"
+        "Conversion" => "conversion.md",
+        "Differentiation" => "differentiation.md",
+        "Implementation" => "implementing.md",
     ],
 )
 

@@ -22,9 +22,9 @@ export GeneralStressState                                   # General iterative 
 export update_stress_state!                                 # For nonzero stress-conditions
 
 # For parameter identification and differentiation of materials
-export material2vector, material2vector!, vector2material   # Convert to/from parameter vector
+export tovector, tovector!, fromvector                      # Convert to/from `AbstractVector`s
 export get_num_tensorcomponents, get_num_statevars          # Information about the specific material
-export get_num_params, get_parameter_type                   # 
+export get_num_params, get_params_eltype                    # 
 export MaterialDerivatives, differentiate_material!         # Differentiation routines
 export allocate_differentiation_output                      # 
 
@@ -139,7 +139,7 @@ struct NoMaterialCache <: AbstractMaterialCache end
 
 # Extra output
 """
-    AbstractExtraOutput()
+    AbstractExtraOutput
 
 By allocating an `AbstractExtraOutput` type, this type can be mutated
 to extract additional information from the internal calculations 
@@ -152,6 +152,7 @@ abstract type AbstractExtraOutput end
 
 struct NoExtraOutput <: AbstractExtraOutput end
 
+include("vector_conversion.jl")
 include("differentiation.jl")
 include("stressiterations.jl")
 include("ErrorExceptions.jl")

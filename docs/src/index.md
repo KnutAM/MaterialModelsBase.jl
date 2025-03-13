@@ -5,51 +5,61 @@ CurrentModule = MaterialModelsBase
 
 [MaterialModelsBase](https://github.com/KnutAM/MaterialModelsBase.jl)
 provides an implementation-agnostic interface for mechanical (stress-strain)
-material models. This facilitates interchanging material models between researchers by having a light-weight common interface.
+material models. This facilitates interchanging material models between researchers by having a light-weight common interface. 
 
-Consequently, there are two types of user roles for this package (often the same
-person takes both roles):
+Key **features** of this package are
+* Implement a material model for 3d, use [stress states](@ref Stress-states) to get, e.g.,
+  uniaxial stress, plane stress, plane strain, and more without further implementation.
+* Conversion routine interface to convert e.g. parameters to a vector and back, allowing    
+  interfacing with optimization libraries for parameter identification.
+* Differentiation routine interface to allow taking derivatives wrt. material parameters etc.
+  to enable gradient-based optimization for parameter identification.
+
+In general, there are two types of user roles for this package (often the same person takes both roles):
 
 1) Someone writing code that use material models (e.g. finite element code)
 2) Someone implementing material models
 
+For nr 1, a brief introduction on how to use material models following the `MaterialModelsBase.jl` interface is given below. For nr 2, a first introduction is provided as a [tutorial](@ref basic-implementation).
+
 ## Using material models
-This section describes how to use a material model defined according to the described interface. The `TestMaterials` module is used to provide some implemented material models (see `test/TestMaterials.jl` in the main repo). Hence, replace `TestMaterials` with the specific material model package(s) you wish to use. 
+This section describes how to use a material model defined according to the described interface.
+As an example, we use the `Zener` material defined in the [implementation tutorial](@ref basic-implementation). For normal usage different materials are defined in a material models package, such as [MechanicalMaterialModels.jl](https://knutam.github.io/MechanicalMaterialModels.jl/dev/).
 
 If we would like to write a function that simulates the uniaxial response
 of a material model, we can write a function to do that as
-```julia
+```@example getstarted
 using MaterialModelsBase, Tensors
-function simulate_uniaxial(m::AbstractMaterial, ϵ11_history, time_history)
-    state = initial_material_state(m)
-    cache = allocate_material_cache(m)
-    stress_state = UniaxialStress()
-    t_old = 0.0
-    σ11_history = similar(ϵ11_history)
-    for i in eachindex(ϵ11_history, time_history)
-        Δt = time_history[i] - t_old
-        ϵ = SymmetricTensor{2,1}((ϵ11_history[i],))
-        σ, dσdϵ, state = material_response(stress_state, m, ϵ, state, Δt, cache)
-        σ11_history[i] = σ[1,1]
-        t_old += Δt
-    end
-    return σ11_history
-end
+```
+```@example getstarted
+include("implementation_snippets/includeshow.jl") #hide
+@includeshow "implementation_snippets/simulate_uniaxial.jl" #hide
 ```
 
-To use this function, we need to define the material parameters for an 
-implemented material model in `TestMaterials`, for example
-```julia
-using TestMaterials
-G1=50.e3; G2=80.e3; K1=100.e3; K2=160.e3; η=50e3;
-material = ViscoElastic(LinearElastic(G1,K1), LinearElastic(G2,K2), η)
+To use this function, we define the material parameters for the 
+`Zener` viscoelastic material model whose implementation is demonstrated
+[here](@ref basic-implementation).
+```@example getstarted
+include("implementation_snippets/zener_example.jl") #hide
+material = Zener(;K = 100.0, G0 = 20.0, G1 = 80.0, η1 = 10.0)
+nothing #hide
 ```
 
-And then we can run the simulation
-```julia
+And then we define the strain and time history, before running the simulation,
+```@example getstarted
 ϵ11_history  = collect(range(0, 0.01; length=100))  # Ramp to 1 %
-time_history = collect(range(0, 0.2; length=100))   # Constant time step
+time_history = collect(range(0, 1; length=100))   # Constant time step
 σ11_history  = simulate_uniaxial(material, ϵ11_history, time_history)
+nothing #hide
+```
+
+We can also plot the stress-strain result,
+```@example getstarted
+import CairoMakie as Plt
+fig = Plt.Figure()
+ax = Plt.Axis(fig[1,1]; xlabel = "strain [%]", ylabel = "stress [MPa]")
+Plt.lines!(ax, ϵ11_history * 100, σ11_history)
+fig
 ```
 
 This example used the stress iterations implemented in `MaterialModelsBase.jl`,
@@ -61,28 +71,6 @@ The package also contains the exception [`NoLocalConvergence`](@ref),
 which should be thrown from inside implemented material routines to signal 
 that something didn't converge and that the caller should consider 
 to e.g. reduce the time step or handle the issue in some other way.
-
-## Implementing material models
-To implement a material model, at minimum, it is necessary to 
-define a material type containing the material parameters, e.g. `MyMaterial`,
-and the associated [`material_response(::MyMaterial, args...)`](@ref material_response) function.
-
-For materials with state variables, the function [`initial_material_state`](@ref) should be defined. 
-
-If some special pre-allocated variables are required for the material, the function [`allocate_material_cache`](@ref) should be defined. 
-
-
-### Advanced use cases
-The package also provides an interface for converting `AbstractMaterial`s 
-to a vector of material parameters and vice versa. However, to implement 
-this part of the interface is not required, if only the standard usage 
-is intended for your material model.
-
-Building upon that option, it is also possible to define differentiation
-of the material response wrt. to the material parameters, which is useful 
-for parameter identification using gradient based methods. For further details, 
-see [Differentation of a material](@ref).
-
 
 ## API
 

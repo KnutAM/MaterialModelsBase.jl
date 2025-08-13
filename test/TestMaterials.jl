@@ -31,12 +31,12 @@ function MMB.material_response(
 end
 
 MMB.get_num_params(::LinearElastic) = 2
-function MMB.tovector!(v::Vector, m::LinearElastic)
-    v[1] = m.G
-    v[2] = m.K
+function MMB.tovector!(v::Vector, m::LinearElastic; offset = 0)
+    v[1 + offset] = m.G
+    v[2 + offset] = m.K
     return v
 end
-MMB.fromvector(v::Vector, ::LinearElastic) = LinearElastic(v[1], v[2])
+MMB.fromvector(v::Vector, ::LinearElastic; offset = 0) = LinearElastic(v[1 + offset], v[2 + offset])
 
 function MMB.differentiate_material!(
     diff::MaterialDerivatives,

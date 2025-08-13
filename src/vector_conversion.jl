@@ -66,25 +66,58 @@ get_params_eltype(::AbstractMaterial) = Float64
 
 # Conversion functions
 """
-    tovector!(v::AbstractVector, m::AbstractMaterial)
+    tovector!(v::AbstractVector, m::AbstractMaterial; offset = 0)
+
 Put the material parameters of `m` into the vector `v`. 
 This is typically used when the parameters should be fitted.
 
-    tovector!(v::AbstractVector, s::AbstractMaterialState)
+    tovector!(v::AbstractVector, s::AbstractMaterialState; offset = 0)
+
 Put the state variables in `s` into the vector `v`.
 This is typically used when differentiating the material 
 wrt. the the old state variables.
+
+    tovector!(v::AbstractVector, a::Union{SecondOrderTensor, FourthOrderTensor}; offset = 0)
+
+Puts the Mandel components of `a` into the vector `v`.
 """
 function tovector! end
 
+# Tensors.jl implementation
+function tovector!(v::AbstractVector, a::SecondOrderTensor; offset = 0)
+    return tomandel!(v, a; offset)
+end
+function tovector!(v::AbstractVector, a::Union{Tensor{4, <:Any, <:Any, M}, SymmetricTensor{4, <:Any, <:Any, M}}; offset = 0) where {M}
+    N = round(Int, sqrt(M))
+    m = reshape(view(v, offset .+ (1:M)), (N, N))
+    tomandel!(m, a)
+    return v
+end
+
 """
-    fromvector(v::AbstractVector, ::MT) where {MT<:AbstractMaterial}
+    fromvector(v::AbstractVector, ::MT; offset = 0) where {MT<:AbstractMaterial}
 Create a material of type `MT` with the parameters according to `v`
 
-    fromvector(v::AbstractVector, ::ST) where {ST<:AbstractMaterialState}
+    fromvector(v::AbstractVector, ::ST; offset = 0) where {ST<:AbstractMaterialState}
 Create a material state of type `ST` with the values according to `v`
+
+    fromvector(v, ::TT; offset = 0) where {TT <: Union{SecondOrderTensor, FourthOrderTensor}}
+
+Create a tensor with shape of `TT` with entries from the Mandel components in `v`.
 """
 function fromvector end
+
+# Tensors.jl implementation
+function fromvector(v::AbstractVector, ::TT; offset = 0) where {TT <: SecondOrderTensor}
+    return frommandel(Tensors.get_base(TT), v; offset)
+end
+
+function fromvector(v::AbstractVector, ::TT; offset = 0) where {TT <: FourthOrderTensor}
+    TB = Tensors.get_base(TT)
+    M = Tensors.n_components(TB)
+    N = round(Int, sqrt(M))
+    return frommandel(TB, reshape(view(v, offset .+ (1:M)), (N, N)))
+end
 
 """
     tovector(m::AbstractMaterial)
@@ -107,6 +140,8 @@ function tovector(s::AbstractMaterialState)
     T = get_statevar_eltype(s)
     return tovector!(zeros(T, get_num_statevars(s)), s)
 end
+
+tovector(a::Union{SecondOrderTensor, FourthOrderTensor}) = (m = tomandel(a); reshape(m, length(m)))
 
 # Backwards compatibility
 const get_parameter_type = get_params_eltype

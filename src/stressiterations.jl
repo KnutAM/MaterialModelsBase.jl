@@ -25,7 +25,8 @@ See also [`ReducedStressState`](@ref).
 material_response(::AbstractStressState, ::AbstractMaterial, args...)
 
 @inline function material_response(stress_state::AbstractStressState, m::AbstractMaterial, args::Vararg{Any,N}) where N
-    return reduced_material_response(stress_state, m, args...)
+    σ, dσdϵ, state, ϵ_full = stress_state_material_response(stress_state, m, args...)
+    return reduce_tensordim(stress_state, σ), reduce_stiffness(stress_state, dσdϵ), state, ϵ_full
 end
 
 update_stress_state!(::AbstractStressState, σ) = nothing
@@ -168,7 +169,7 @@ get_tolerance(ss::UniaxialNormalStress) = get_tolerance(ss.settings)
 get_max_iter(ss::UniaxialNormalStress) = get_max_iter(ss.settings)
 
 """
-    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3,Bool}; kwargs...)
+    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3}; kwargs...)
 
 Construct a general stress state controlled by `σ_ctrl` whose component is `true` if that 
 component is stress-controlled and `false` if it is strain-controlled. If stress-controlled,
@@ -252,15 +253,15 @@ reduce_tensordim(::Val{dim}, a::SymmetricTensor{2}) where dim = SymmetricTensor{
 reduce_tensordim(::Val{dim}, A::SymmetricTensor{4}) where dim = SymmetricTensor{4,dim}((i,j,k,l)->A[i,j,k,l])
 
 
-function reduced_material_response(stress_state::NoIterationState, 
+function stress_state_material_response(stress_state::NoIterationState, 
         m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where N
 
     ϵ_full = expand_tensordim(stress_state, ϵ)
     σ, dσdϵ, new_state = material_response(m, ϵ_full, args...)
-    return reduce_tensordim(stress_state, σ), reduce_tensordim(stress_state, dσdϵ), new_state, ϵ_full
+    return σ, dσdϵ, new_state, ϵ_full
 end
 
-function reduced_material_response(stress_state::IterationState, 
+function stress_state_material_response(stress_state::IterationState, 
         m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where N
 
     # Newton options
@@ -274,8 +275,7 @@ function reduced_material_response(stress_state::IterationState,
         σ_mandel = get_unknowns(stress_state, σ_full)
 
         if norm(σ_mandel) < tol
-            dσdϵ = reduce_stiffness(stress_state, dσdϵ_full)
-            return reduce_tensordim(stress_state, σ_full), dσdϵ, new_state, ϵ_full
+            return σ_full, dσdϵ_full, new_state, ϵ_full
         end
 
         dσdϵ_mandel = get_unknowns(stress_state, dσdϵ_full)
@@ -284,12 +284,20 @@ function reduced_material_response(stress_state::IterationState,
     throw(NoStressConvergence("Stress iterations with the NewtonSolver did not converge"))
 end
 
-reduce_stiffness(::State3D, dσdϵ_full::AbstractTensor{4,3}) = dσdϵ_full
+reduce_stiffness(ss::State3D, dσdϵ_full) = reduce_stiffness(Val(3), ss, dσdϵ_full)
+reduce_stiffness(ss::State2D, dσdϵ_full) = reduce_stiffness(Val(2), ss, dσdϵ_full)
+reduce_stiffness(ss::State1D, dσdϵ_full) = reduce_stiffness(Val(1), ss, dσdϵ_full)
 
-function reduce_stiffness(stress_state, dσdϵ_full::AbstractTensor{4,3})
+reduce_stiffness(::Val{3}, ::State3D, dσdϵ_full::AbstractTensor{4,3}) = dσdϵ_full
+
+function reduce_stiffness(::Union{Val{1}, Val{2}}, stress_state::IterationState, dσdϵ_full::AbstractTensor{4,3})
     ∂σᶠ∂ϵᶠ, ∂σᶠ∂ϵᶜ, ∂σᶜ∂ϵᶠ, ∂σᶜ∂ϵᶜ = extract_substiffnesses(stress_state, dσdϵ_full)
     dσᶜdϵᶜ = ∂σᶜ∂ϵᶜ - ∂σᶜ∂ϵᶠ * (∂σᶠ∂ϵᶠ \ ∂σᶠ∂ϵᶜ)
     return convert_stiffness(dσᶜdϵᶜ, stress_state, dσdϵ_full)
+end
+
+function reduce_stiffness(::Union{Val{1}, Val{2}}, stress_state::NoIterationState, dσdϵ_full::AbstractTensor{4,3})
+    return reduce_tensordim(stress_state, dσdϵ_full)
 end
 
 convert_stiffness(dσᶜdϵᶜ::SMatrix{1,1}, ::State1D, ::SymmetricTensor) = frommandel(SymmetricTensor{4,1}, dσᶜdϵᶜ)
@@ -411,7 +419,7 @@ function get_full_tensor(state::GeneralStressState{Nσ}, ::TT, v::SVector{Nσ,T}
 end
 
 function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}) where {Nσ, T}
-    shear_factor = T(√2)
+    shear_factor = a isa SymmetricTensor ? T(√2) : one(T)
     s(i,j) = i==j ? one(T) : shear_factor
     f(c) = ((i,j) = c; s(i,j)*(a[i,j]-state.σ[i,j]))
     return SVector{Nσ}((f(c) for c in state.σm_inds))

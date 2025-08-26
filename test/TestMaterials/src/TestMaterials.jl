@@ -5,9 +5,10 @@ using Tensors, StaticArrays, ForwardDiff
 # Overloaded functions
 import MaterialModelsBase as MMB
 
-# Exported materials
-export LinearElastic, ViscoElastic
-# Todo: Also NeoHookean to test nonlinear geometric materials
+# Test material implementations
+# * LinearElastic
+# * ViscoElastic
+# TODO: NeoHookean (geometrically nonlinear materials)
 
 # LinearElastic material 
 struct LinearElastic{T} <: AbstractMaterial 

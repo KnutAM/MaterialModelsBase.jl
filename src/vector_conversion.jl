@@ -83,6 +83,8 @@ Puts the Mandel components of `a` into the vector `v`.
 """
 function tovector! end
 
+tovector!(v::AbstractVector, ::NoMaterialState; kwargs...) = v
+
 # Tensors.jl implementation
 function tovector!(v::AbstractVector, a::SecondOrderTensor; offset = 0)
     return tomandel!(v, a; offset)
@@ -106,6 +108,8 @@ Create a material state of type `ST` with the values according to `v`
 Create a tensor with shape of `TT` with entries from the Mandel components in `v`.
 """
 function fromvector end
+
+fromvector(::AbstractVector, ::NoMaterialState; kwargs...) = NoMaterialState()
 
 # Tensors.jl implementation
 function fromvector(v::AbstractVector, ::TT; offset = 0) where {TT <: SecondOrderTensor}

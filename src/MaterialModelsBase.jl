@@ -1,5 +1,6 @@
 module MaterialModelsBase
 using Tensors, StaticArrays
+using ForwardDiff: ForwardDiff
 import Base: @kwdef
 
 # General interface for <:AbstractMaterial
@@ -153,8 +154,8 @@ abstract type AbstractExtraOutput end
 struct NoExtraOutput <: AbstractExtraOutput end
 
 include("vector_conversion.jl")
-include("differentiation.jl")
 include("stressiterations.jl")
+include("differentiation.jl")
 include("ErrorExceptions.jl")
 
 end

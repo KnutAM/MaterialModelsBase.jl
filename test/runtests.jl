@@ -1,11 +1,9 @@
 using MaterialModelsBase
 using Test
 using Tensors, StaticArrays
+import MaterialModelsBase as MMB
+using TestMaterials: LinearElastic, ViscoElastic
 
-const MMB = MaterialModelsBase
-
-include("TestMaterials.jl")
-using .TestMaterials
 include("utils4testing.jl")
 
 include("vector_conversion.jl")

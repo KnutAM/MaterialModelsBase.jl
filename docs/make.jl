@@ -19,6 +19,7 @@ makedocs(;
         "Conversion" => "conversion.md",
         "Differentiation" => "differentiation.md",
         "Implementation" => "implementing.md",
+        "Devdocs" => "devdocs.md"
     ],
 )
 

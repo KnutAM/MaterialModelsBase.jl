@@ -26,7 +26,8 @@ export update_stress_state!                                 # For nonzero stress
 export tovector, tovector!, fromvector                      # Convert to/from `AbstractVector`s
 export get_num_tensorcomponents, get_num_statevars          # Information about the specific material
 export get_num_params, get_params_eltype                    # 
-export MaterialDerivatives, differentiate_material!         # Differentiation routines
+export MaterialDerivatives, StressStateDerivatives          # Derivative collections
+export differentiate_material!                              # Differentiation routines
 export allocate_differentiation_output                      # 
 
 abstract type AbstractMaterial end

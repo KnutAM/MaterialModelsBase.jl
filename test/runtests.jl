@@ -2,7 +2,8 @@ using MaterialModelsBase
 using Test
 using Tensors, StaticArrays
 import MaterialModelsBase as MMB
-using TestMaterials: LinearElastic, ViscoElastic
+using TestMaterials: TestMaterials, LinearElastic, ViscoElastic
+using FiniteDiff: FiniteDiff
 
 include("utils4testing.jl")
 

@@ -4,12 +4,14 @@ authors = ["Knut Andreas <knutam@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 MaterialModelsBase = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 
 [compat]
+FiniteDiff = "2.28.1"
 ForwardDiff = "1.1.0"
 StaticArrays = "1.9.14"
 Tensors = "1.16.2"

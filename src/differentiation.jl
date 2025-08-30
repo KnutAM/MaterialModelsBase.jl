@@ -1,10 +1,18 @@
 struct MaterialDerivatives{T}
     dσdϵ::Matrix{T}
-    dσdⁿs::Matrix{T}
+    #dσdⁿs::Matrix{T}
     dσdp::Matrix{T}
     dsdϵ::Matrix{T}
-    dsdⁿs::Matrix{T}
+    #dsdⁿs::Matrix{T}
     dsdp::Matrix{T}
+end
+
+function Base.getproperty(d::MaterialDerivatives, key::Symbol)
+    if key === :dσdⁿs || key === :dsdⁿs
+        error("You are probably assuming MaterialModelsBase v0.2 behavior for differentiation")
+    else
+        @inline getfield(d, key)
+    end
 end
 
 """
@@ -36,10 +44,8 @@ function MaterialDerivatives(m::AbstractMaterial)
     dsdp = ForwardDiff.jacobian(p -> tovector(initial_material_state(fromvector(p, m))), tovector(m))
     return MaterialDerivatives(
         zeros(T, n_tensor, n_tensor),  # dσdϵ
-        zeros(T, n_tensor, n_state),   # dσdⁿs
         zeros(T, n_tensor, n_params),  # dσdp
         zeros(T, n_state, n_tensor),   # dsdϵ
-        zeros(T, n_state, n_state),    # dsdⁿs
         dsdp
         )
 end
@@ -82,6 +88,22 @@ struct StressStateDerivatives{T}
     # TODO: Reduce the dimensions, for now all entries (even those that are zero) are stored.
 end
 
+function StressStateDerivatives(::AbstractStressState, m::AbstractMaterial)
+    mderiv = MaterialDerivatives(m)
+    np = get_num_params(m)
+    nt = get_num_tensorcomponents(m) # Should be changed to only save non-controlled entries
+    dϵdp = zeros(nt, np)
+    dσdp = zeros(nt, np)
+    # Should be changed to only save non-controlled entries
+    vo = Tensors.DEFAULT_VOIGT_ORDER[3]
+    if nt == 6
+        index = SMatrix{3, 3, Int}(min(vo[i, j], vo[j, i]) for i in 1:3, j in 1:3)
+    else
+        index = SMatrix{3, 3, Int}(vo)
+    end
+    return StressStateDerivatives(mderiv, dϵdp, dσdp, index, index)
+end
+
 """
     differentiate_material!(ssd::StressStateDerivatives, stress_state, m, args...)
 
@@ -95,14 +117,22 @@ For material models that directly implement `material_response(stress_state, m, 
 to calculate the derivatives in `ssd`. Here the user has full control and no modifications occur automatically, however, typically the 
 (total) derivatives `ssd.dσdp`, `ssd.dϵdp`, and `ssd.mderiv.dsdp` should be updated. 
 """
-function differentiate_material!(ssd::StressStateDerivatives, stress_state::AbstractStressState, m::AbstractMaterial, args::Vararg{Any,N}) where {N}
-    σ_full, dσdϵ_full, state, ϵ_full = stress_state_material_response(stress_state, m, args...)
-    differentiate_material!(ssd.mderiv, m, args..., dσdϵ_full)
-    dσᶠdϵᶠ_inv = inv(get_unknowns(stress_state, dσdϵ_full)) # f: unknown strain components solved for during stress iterations
-    ssd.dϵdp[sc, :] .= .-dσᶠdϵᶠ_inv * ssd.mderiv.dσdp[sc, :]
-    ssd.dσdp[ec, :] .= ssd.mderiv.dσdp .+ ssd.mderiv.dσdϵ[ec, sc] * ssd.dϵdp[sc, :]
-    ssd.mderiv.dsdp .+= ssd.mderiv.dsdϵ[:, sc] * ssd.dϵdp[sc, :]
-    return return reduce_tensordim(stress_state, σ_full), reduce_stiffness(stress_state, dσdϵ_full), state, ϵ_full
+function differentiate_material!(ssd::StressStateDerivatives, stress_state::AbstractStressState, m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where {N}
+    σ_full, dσdϵ_full, state, ϵ_full = stress_state_material_response(stress_state, m, ϵ, args...)
+    differentiate_material!(ssd.mderiv, m, ϵ_full, args..., dσdϵ_full)
+    
+    if isa(stress_state, NoIterationState)
+        copy!(ssd.dσdp, ssd.mderiv.dσdp)
+        fill!(ssd.dϵdp, 0)
+    else
+        sc = stress_controlled_indices(stress_state, ϵ)
+        ec = strain_controlled_indices(stress_state, ϵ)
+        dσᶠdϵᶠ_inv = inv(get_unknowns(stress_state, dσdϵ_full)) # f: unknown strain components solved for during stress iterations
+        ssd.dϵdp[sc, :] .= .-dσᶠdϵᶠ_inv * ssd.mderiv.dσdp[sc, :]
+        ssd.dσdp[ec, :] .= ssd.mderiv.dσdp[ec, :] .+ ssd.mderiv.dσdϵ[ec, sc] * ssd.dϵdp[sc, :]
+        ssd.mderiv.dsdp .+= ssd.mderiv.dsdϵ[:, sc] * ssd.dϵdp[sc, :]
+    end
+    return reduce_tensordim(stress_state, σ_full), reduce_stiffness(stress_state, dσdϵ_full), state, ϵ_full
 end
 
 """

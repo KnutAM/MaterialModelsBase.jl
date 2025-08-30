@@ -20,20 +20,97 @@
 end
 
 @testset "differentiation" begin
-    G = rand()
-    K = G + rand()
-    m = LinearElastic(G, K)
-    ϵ = rand(SymmetricTensor{2,3})
-    diff = MaterialDerivatives(m)
-    IxI = one(SymmetricTensor{2,3}) ⊗ one(SymmetricTensor{2,3})
-    dσdϵ = 2G*(one(SymmetricTensor{4,3}) - IxI/3) + K*IxI
-    dσdG = 2*(one(SymmetricTensor{4,3}) - IxI/3) ⊡ ϵ
-    dσdK = IxI ⊡ ϵ
+    @testset "Analytical for LinearElastic" begin
+        G = rand()
+        K = G + rand()
+        m = LinearElastic(G, K)
+        ϵ = rand(SymmetricTensor{2,3})
+        diff = MaterialDerivatives(m)
+        IxI = one(SymmetricTensor{2,3}) ⊗ one(SymmetricTensor{2,3})
+        dσdϵ = 2G*(one(SymmetricTensor{4,3}) - IxI/3) + K*IxI
+        dσdG = 2*(one(SymmetricTensor{4,3}) - IxI/3) ⊡ ϵ
+        dσdK = IxI ⊡ ϵ
 
-    old = NoMaterialState(); Δt = nothing
-    cache = NoMaterialCache(); extras = allocate_differentiation_output(m)
-    differentiate_material!(diff, m, ϵ, old, Δt, cache, extras, dσdϵ)
-    @test diff.dσdϵ ≈ tomandel(dσdϵ)
-    @test diff.dσdp[:,1] ≈ tomandel(dσdG)
-    @test diff.dσdp[:,2] ≈ tomandel(dσdK)
+        old = NoMaterialState(); Δt = nothing
+        cache = NoMaterialCache(); extras = allocate_differentiation_output(m)
+        differentiate_material!(diff, m, ϵ, old, Δt, cache, extras, dσdϵ)
+        @test diff.dσdϵ ≈ tomandel(dσdϵ)
+        @test diff.dσdp[:,1] ≈ tomandel(dσdG)
+        @test diff.dσdp[:,2] ≈ tomandel(dσdK)
+    end
+    function test_derivative(m, ϵ, state, Δt; comparesettings = (), numdiffsettings = (), diff = MaterialDerivatives(m))
+        diff_num = MaterialDerivatives(m)
+        copy!(diff_num.dsdp, diff.dsdp)
+
+        cache = allocate_material_cache(m)
+        extras = allocate_differentiation_output(m)
+        _, dσdϵ, _ = material_response(m, ϵ, state, Δt, cache, extras)
+        differentiate_material!(diff, m, ϵ, state, Δt, cache, extras, dσdϵ)
+        TestMaterials.obtain_numerical_material_derivative!(diff_num, m, ϵ, state, Δt; numdiffsettings...)
+        for key in fieldnames(typeof(diff))
+            @testset "$key" begin
+                check = isapprox(getfield(diff, key), getfield(diff_num, key); comparesettings...)
+                @test check
+                if !check
+                    println("Printing derivative, numerical derivative, and relative diff of each term")
+                    display(getfield(diff, key))
+                    display(getfield(diff_num, key))
+                    display((getfield(diff, key) .- getfield(diff_num, key)) ./ (1e-100 .+ abs.(getfield(diff, key)) + abs.(getfield(diff_num, key))))
+                    println("Done printing for failed test above")
+                end
+            end
+        end
+    end
+
+    @testset "Numerical (3D material)" begin
+        elastic = LinearElastic(0.52, 0.77)
+        viscoelastic = ViscoElastic(elastic, LinearElastic(0.33, 0.54), 0.36)
+        for m in (elastic, viscoelastic)    
+            @testset "Initial response" begin
+                ϵ = rand(SymmetricTensor{2,3}) * 1e-3
+                Δt = 1e-2
+                test_derivative(m, ϵ, initial_material_state(m), Δt; 
+                    numdiffsettings = (fdtype = Val{:central},),
+                    comparesettings = ()
+                    )
+                diff = MaterialDerivatives(m)
+                copy!(diff.dsdp, rand(size(diff.dsdp)...))
+                test_derivative(m, ϵ, initial_material_state(m), Δt; 
+                    numdiffsettings = (fdtype = Val{:central},),
+                    comparesettings = (),
+                    diff)
+            end
+            @testset "After shear loading" begin
+                ϵ21 = 0.01; num_steps = 10; t_end = 0.01
+                stressfun(p) = TestMaterials.runstrain(fromvector(p, m), ϵ21, (2, 1), t_end, num_steps)[1]
+                dσ21_dp_num = FiniteDiff.finite_difference_jacobian(stressfun, tovector(m), Val{:central}; relstep = 1e-6)
+                σv, state, dσ21_dp, diff = TestMaterials.runstrain_diff(m, ϵ21, (2, 1), t_end, num_steps)
+                @test σv ≈ stressfun(tovector(m))
+                @test dσ21_dp ≈ dσ21_dp_num
+            end
+            @testset "FullStressState" begin
+                ϵ21 = 0.01; num_steps = 10; t_end = 0.01
+                ss = FullStressState()
+                # Check that we get the same result for runstresstate and runstrain
+                σ_ss, s_ss = TestMaterials.runstresstate(ss, m, ϵ21, (2, 1), t_end, num_steps)
+                σ, s = TestMaterials.runstrain(m, ϵ21, (2, 1), t_end, num_steps)
+                @test σ_ss ≈ σ
+                @test tovector(s_ss) ≈ tovector(s)
+            end
+            for (stress_state, ij) in (
+                    (UniaxialStress(), (1,1)), (UniaxialStrain(), (1,1)), 
+                    (UniaxialNormalStress(), (1,1)), (UniaxialNormalStress(), (2,1)),
+                    (PlaneStress(), (2, 2)), (PlaneStrain(), (2, 1)),
+                    (GeneralStressState(SymmetricTensor{2,3,Bool}((true, false, false, false, true, true)), rand(SymmetricTensor{2,3})), (2,2))
+                    )
+                @testset "$(nameof(typeof(stress_state))), (i,j) = ($(ij[1]), $(ij[2]))" begin
+                    ϵij = 0.01; num_steps = 1; t_end = 0.01
+                    stressfun(p) = TestMaterials.runstresstate(stress_state, fromvector(p, m), ϵij, ij, t_end, num_steps)[1]
+                    dσij_dp_num = FiniteDiff.finite_difference_jacobian(stressfun, tovector(m), Val{:central}; relstep = 1e-6)
+                    σv, state, dσij_dp, diff = TestMaterials.runstresstate_diff(stress_state, m, ϵij, ij, t_end, num_steps)
+                    @test dσij_dp ≈ dσij_dp_num
+                end
+            end
+        end
+    end
 end

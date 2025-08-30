@@ -14,9 +14,10 @@ julia = "1.11"
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestMaterials = "aa4f4413-326f-4ddd-a53e-c58801ebfeaf"
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 
 [sources]
 TestMaterials = {path = "test/TestMaterials"}
 
 [targets]
-test = ["Test", "TestMaterials"]
+test = ["Test", "FiniteDiff", "TestMaterials"]

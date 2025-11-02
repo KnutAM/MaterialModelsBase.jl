@@ -76,6 +76,19 @@ allocate_differentiation_output(::AbstractMaterial) = NoExtraOutput()
 
 Calculate the derivatives and save them in `diff`, see
 [`MaterialDerivatives`](@ref) for a description of the fields in `diff`.
+
+    differentiate_material!(ssd::StressStateDerivatives, stress_state, m, args...)
+
+For material models implementing `material_response(m, args...)` and `differentiate_material!(::MaterialDerivatives, m, args...)`,
+this method will work automatically by
+1) Calling `σ, dσdϵ, state = material_response(stress_state, m, args...)` (except that `dσdϵ::FourthOrderTensor{dim = 3}` is extracted)
+2) Calling `differentiate_material!(ssd.mderiv::MaterialDerivatives, m, args..., dσdϵ::FourthOrderTensor{3})`
+3) Updating `ssd` according to the constraints imposed by the `stress_state`.
+
+For material models that directly implement `material_response(stress_state, m, args...)`, this function should be overloaded directly
+to calculate the derivatives in `ssd`. Here the user has full control and no modifications occur automatically, however, typically the 
+(total) derivatives `ssd.dσdp`, `ssd.dϵdp`, and `ssd.mderiv.dsdp` should be updated. 
+The exact interface of the `StressStateDerivatives` datastructure is still not fixed, and may change in the future.
 """
 function differentiate_material! end
 
@@ -104,19 +117,6 @@ function StressStateDerivatives(::AbstractStressState, m::AbstractMaterial)
     return StressStateDerivatives(mderiv, dϵdp, dσdp, index, index)
 end
 
-"""
-    differentiate_material!(ssd::StressStateDerivatives, stress_state, m, args...)
-
-For material models implementing `material_response(m, args...)` and `differentiate_material!(::MaterialDerivatives, m, args...)`,
-this method will work automatically by
-1) Calling `σ, dσdϵ, state = material_response(stress_state, m, args...)` (except that `dσdϵ::FourthOrderTensor{dim = 3}` is extracted)
-2) Calling `differentiate_material!(ssd.mderiv::MaterialDerivatives, m, args..., dσdϵ::FourthOrderTensor{3})`
-3) Updating `ssd` according to the constraints imposed by the `stress_state`.
-
-For material models that directly implement `material_response(stress_state, m, args...)`, this function should be overloaded directly
-to calculate the derivatives in `ssd`. Here the user has full control and no modifications occur automatically, however, typically the 
-(total) derivatives `ssd.dσdp`, `ssd.dϵdp`, and `ssd.mderiv.dsdp` should be updated. 
-"""
 function differentiate_material!(ssd::StressStateDerivatives, stress_state::AbstractStressState, m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where {N}
     σ_full, dσdϵ_full, state, ϵ_full = stress_state_material_response(stress_state, m, ϵ, args...)
     differentiate_material!(ssd.mderiv, m, ϵ_full, args..., dσdϵ_full)

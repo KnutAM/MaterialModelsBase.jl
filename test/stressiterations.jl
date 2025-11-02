@@ -16,7 +16,11 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
             ared = rand(TT{2,_getdim(stress_state)})
             afull = MMB.expand_tensordim(stress_state, ared)
             @test _getdim(afull) == 3    # Full dimensional tensor
-            @test norm(ared) ≈ norm(afull)    # Only add zeros
+            if TT == SymmetricTensor
+                @test norm(ared) ≈ norm(afull)    # Only add zeros
+            else # Add ones to diagonal
+                @test sqrt(norm(ared)^2 + (3 - _getdim(ared))) ≈ norm(afull)
+            end
             # Test invertability of conversions
             @test ared ≈ MMB.reduce_tensordim(stress_state, afull)
         end
@@ -135,6 +139,41 @@ end
     @test σ_w == σ
     @test dσdϵ_w == dσdϵ
     @test ϵfull_w == ϵfull
+end
+
+@testset "hyperelastic" begin
+    G = 80.e3           # Shear modulus (μ)
+    K = 160.e3          # Bulk modulus
+    E = 9*K*G/(3*K+G)   # Young's modulus
+    ν = E/2G - 1        # Poisson's ratio
+    λ = K - 2G/3        # Lame parameter
+
+    Δϵ = 1e-6   # Small strain to compare with linear case
+    rtol = 1e-5 # Relative tolerance to compare with linear case
+    @testset for m in (StVenant(;G, K), NeoHooke(;G, K))
+        old = initial_material_state(m)
+        # UniaxialStress
+        P, dPdF, state, Ffull = material_response(UniaxialStress(), m, Tensor{2,1}((1 + Δϵ,)), old, 0.0)
+        @test isapprox(P[1,1], E*Δϵ; rtol)
+        @test isapprox(dPdF[1,1,1,1], E; rtol)
+        @test Ffull[2,2] ≈ Ffull[3,3]
+        @test Ffull[2,2] ≈ 1-ν*Δϵ
+        
+        # UniaxialStrain
+        P, dPdF, state, Ffull = material_response(UniaxialStrain(), m, Tensor{2,1}((1 + Δϵ,)), old, 0.0)
+        @test isapprox(P[1,1], (2G+λ)*Δϵ; rtol)
+        @test isapprox(dPdF[1,1,1,1], (2G+λ); rtol)
+        P_full, dPdF_full, _ = material_response(m, Ffull, old, 0.0)
+        @test isapprox(P_full[2,2], λ*Δϵ; rtol)
+
+        # PlaneStress
+        ϵ = Δϵ * rand(SymmetricTensor{2,2})
+        F = one(Tensor{2,2}) + ϵ
+        P, dPdF, state, Ffull = material_response(PlaneStress(), m, F, old, 0.0)
+        Dvoigt = (E/(1-ν^2))*[1 ν 0; ν 1 0; 0 0 (1-ν)/2]
+        @test isapprox(tovoigt(symmetric(dPdF)), Dvoigt; rtol)
+        @test isapprox(P, fromvoigt(SymmetricTensor{4,2}, Dvoigt)⊡ϵ; rtol)
+    end
 end
 
 @testset "visco_elastic" begin

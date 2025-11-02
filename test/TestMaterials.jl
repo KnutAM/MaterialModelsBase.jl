@@ -6,8 +6,7 @@ using Tensors, StaticArrays, ForwardDiff
 import MaterialModelsBase as MMB
 
 # Exported materials
-export LinearElastic, ViscoElastic
-# Todo: Also NeoHookean to test nonlinear geometric materials
+#export LinearElastic, ViscoElastic
 
 # LinearElastic material 
 struct LinearElastic{T} <: AbstractMaterial 

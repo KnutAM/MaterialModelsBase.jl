@@ -234,11 +234,11 @@ const State1D = Union{UniaxialStrain, UniaxialStress}
 # Translate from reduced dim input to full tensors
 expand_tensordim(::AbstractStressState, a::Tensors.AllTensors{3}) = a
 #expand_tensordim(::AbstractStressState, v::Vec{dim,T}) where {dim,T} = Vec{3,T}(i->i>dim ? zero(T) : v[i])
-function expand_tensordim(::AbstractStressState, a::Tensor{2,dim,T}) where {dim,T} 
-    return Tensor{2,3}((i,j)-> (i<=dim && j<=dim) ? a[i,j] : zero(T))
+function expand_tensordim(::AbstractStressState, F::Tensor{2,dim,T}) where {dim,T} 
+    return Tensor{2,3}((i,j)-> (i<=dim && j<=dim) ? F[i,j] : (i == j ? one(T) : zero(T)))
 end
-function expand_tensordim(::AbstractStressState, a::SymmetricTensor{2,dim,T}) where {dim,T} 
-    return SymmetricTensor{2,3}((i,j)-> (i<=dim && j<=dim) ? a[i,j] : zero(T))
+function expand_tensordim(::AbstractStressState, ϵ::SymmetricTensor{2,dim,T}) where {dim,T} 
+    return SymmetricTensor{2,3}((i,j)-> (i<=dim && j<=dim) ? ϵ[i,j] : zero(T))
 end
 
 # Translate from full tensors to reduced output

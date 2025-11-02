@@ -114,7 +114,8 @@ end
 Return the (default) initial `state::AbstractMaterialState` 
 of the material `m`. 
 
-Defaults to the empty `NoMaterialState()`
+Defaults to the empty `NoMaterialState{T}()`, where 
+`T = get_params_eltype(m)` (which defaults to `Float64`).
 """
 function initial_material_state(m::AbstractMaterial)
     T = get_params_eltype(m)

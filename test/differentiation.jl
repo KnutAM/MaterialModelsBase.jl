@@ -31,7 +31,7 @@ end
         dσdG = 2*(one(SymmetricTensor{4,3}) - IxI/3) ⊡ ϵ
         dσdK = IxI ⊡ ϵ
 
-        old = NoMaterialState(); Δt = nothing
+        old = NoMaterialState{Float64}(); Δt = nothing
         cache = NoMaterialCache(); extras = allocate_differentiation_output(m)
         differentiate_material!(diff, m, ϵ, old, Δt, cache, extras, dσdϵ)
         @test diff.dσdϵ ≈ tomandel(dσdϵ)

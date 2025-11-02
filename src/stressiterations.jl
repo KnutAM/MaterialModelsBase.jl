@@ -412,10 +412,17 @@ end
 
 # GeneralStressState
 function get_full_tensor(state::GeneralStressState{Nσ}, ::TT, v::SVector{Nσ,T}) where {Nσ,T,TT}
-    shear_factor = T(1/√2)
+    TB = Tensors.get_base(TT)
+    shear_factor = if TB == SymmetricTensor{2,3}
+        T(1/√2)
+    elseif TB == Tensor{2,3}
+        one(T)
+    else
+        error("GeneralStressState expects full dimension of strain input")
+    end
     s(i,j) = i==j ? one(T) : shear_factor
     f(i,j) = state.σ_ctrl[i,j] ? v[state.σ_minds[i,j]]*s(i,j) : zero(T)
-    return Tensors.get_base(TT)(f)
+    return TB(f)
 end
 
 function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}) where {Nσ, T}
@@ -426,7 +433,7 @@ function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}) 
 end
 
 function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{4,3,T}) where {Nσ,T}
-    shear_factor = T(√2)
+    shear_factor = a isa SymmetricTensor ? T(√2) : one(T)
     s(i,j) = i==j ? one(T) : shear_factor
     f(c1,c2) = ((i,j) = c1; (k,l) = c2; a[i,j,k,l]*s(i,j)*s(k,l))
     return SMatrix{Nσ,Nσ,T}((f(c1,c2) for c1 in state.σm_inds, c2 in state.σm_inds))

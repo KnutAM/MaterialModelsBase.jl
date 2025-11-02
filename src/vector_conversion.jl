@@ -4,10 +4,10 @@
 
 Return the type of the primary input (strain-like) and associated output (stress-like) 
 to the material model. The default is `SymmetricTensor{2, 3}` for small-strain material 
-models in 3D, but typically, it can be 
-* Small strain material model: `SymmetricTensor{2, dim}`
-* Large strain material model: `Tensor{2, dim}`
-* Traction-separation law: `Vec{dim}`
+models in 3D, but it can be 
+* Small strain material model: Small strain tensor, `ϵ::SymmetricTensor{2, dim}`
+* Large strain material model: Deformation gradient, `F::Tensor{2, dim}`
+* Traction-separation law: Displacement jump, `Δu::Vec{dim}`
 
 Where `dim = 3` is most common, but any value, 1, 2, or 3, is valid. 
 """

@@ -1,6 +1,7 @@
 using MaterialModelsBase
 using Test
 using Tensors, StaticArrays
+import Base: @kwdef
 
 const MMB = MaterialModelsBase
 

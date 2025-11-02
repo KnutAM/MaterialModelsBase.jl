@@ -49,6 +49,7 @@ Get the type used to store each scalar component of the material state variables
 defaults to `Float64`.
 """
 get_statevar_eltype(::AbstractMaterialState) = Float64
+get_statevar_eltype(::NoMaterialState{T}) where {T} = T
 
 """
     get_num_params(m::AbstractMaterial)
@@ -109,7 +110,7 @@ Create a tensor with shape of `TT` with entries from the Mandel components in `v
 """
 function fromvector end
 
-fromvector(::AbstractVector, ::NoMaterialState; kwargs...) = NoMaterialState()
+fromvector(::AbstractVector{T}, ::NoMaterialState; kwargs...) where {T} = NoMaterialState{T}()
 
 # Tensors.jl implementation
 function fromvector(v::AbstractVector, ::TT; offset = 0) where {TT <: SecondOrderTensor}

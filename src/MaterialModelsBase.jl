@@ -116,12 +116,13 @@ of the material `m`.
 
 Defaults to the empty `NoMaterialState()`
 """
-function initial_material_state(::AbstractMaterial) 
-    return NoMaterialState()
+function initial_material_state(m::AbstractMaterial)
+    T = get_params_eltype(m)
+    return NoMaterialState{T}()
 end
 
 abstract type AbstractMaterialState end
-struct NoMaterialState <: AbstractMaterialState end
+struct NoMaterialState{T} <: AbstractMaterialState end
 
 # Material cache 
 """

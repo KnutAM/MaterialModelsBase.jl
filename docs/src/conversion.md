@@ -28,7 +28,7 @@ The following should be defined for new materials, state variables, and alike
 tovector!
 fromvector
 ```
-whereas the following already have default implemenations that should work provided that the above functions are implemented,
+whereas the following already have default implementations that should work provided that the above functions are implemented,
 ```@docs
 tovector
 ```

@@ -38,8 +38,8 @@ Creates a subtype of `AbstractMaterial` that wraps a stress state and a material
 calls to `material_response(w::ReducedStressState, args...)` gives the same result as 
 `material_response(s, m, args...)`. 
 Calls to `initial_material_state`, `allocate_material_cache`, 
-`get_num_tensorcomponents`, `get_num_statevars`, `get_num_params`, 
-`get_params_eltype`, `tovector!`, `tovector`, 
+`get_num_tensorcomponents`, `get_num_statevars`, `get_vector_length`, 
+`get_vector_eltype`, `tovector!`, `tovector`, 
 and `allocate_differentiation_output` are forwarded with `m` as the argument. 
 `fromvector` returns `ReducedStressState` and is supported as well.
 """
@@ -48,8 +48,8 @@ struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: Abstrac
     material::M
 end
 for op in ( :initial_material_state, :allocate_material_cache, 
-            :get_num_tensorcomponents, :get_num_statevars, :get_num_params, 
-            :get_params_eltype, :allocate_differentiation_output)
+            :get_num_tensorcomponents, :get_num_statevars, :get_vector_length, 
+            :get_vector_eltype, :allocate_differentiation_output)
     @eval @inline $op(rss::ReducedStressState) = $op(rss.material)
 end
 function tovector!(v::AbstractVector, rss::ReducedStressState)

@@ -19,8 +19,8 @@ end
     MaterialDerivatives(m::AbstractMaterial)
 
 A struct that saves all derivative information using a `Matrix{T}` for each derivative,
-where `T=get_params_eltype(m)`. The dimensions are obtained from `get_num_tensorcomponents`, 
-`get_num_statevars`, and `get_num_params`. `m` must support `tovector` and `fromvector`, while 
+where `T=get_vector_eltype(m)`. The dimensions are obtained from `get_num_tensorcomponents`, 
+`get_num_statevars`, and `get_vector_length`. `m` must support `tovector` and `fromvector`, while 
 the output of `initial_material_state` must support `tovector`, and in addition the element type
 of `tovector(initial_material_state(m))` must respect the element type in `tovector(m)` for any `m`.
 
@@ -37,10 +37,10 @@ and old state variables, and `p` the material parameter vector.
 
 """
 function MaterialDerivatives(m::AbstractMaterial)
-    T = get_params_eltype(m)
+    T = get_vector_eltype(m)
     n_tensor = get_num_tensorcomponents(m)
     n_state = get_num_statevars(m)
-    n_params = get_num_params(m)
+    n_params = get_vector_length(m)
     dsdp = ForwardDiff.jacobian(p -> tovector(initial_material_state(fromvector(p, m))), tovector(m))
     return MaterialDerivatives(
         zeros(T, n_tensor, n_tensor),  # dσdϵ
@@ -103,7 +103,7 @@ end
 
 function StressStateDerivatives(::AbstractStressState, m::AbstractMaterial)
     mderiv = MaterialDerivatives(m)
-    np = get_num_params(m)
+    np = get_vector_length(m)
     nt = get_num_tensorcomponents(m) # Should be changed to only save non-controlled entries
     dϵdp = zeros(nt, np)
     dσdp = zeros(nt, np)

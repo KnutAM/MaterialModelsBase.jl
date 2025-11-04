@@ -1,3 +1,68 @@
+"""
+    tovector!(v::AbstractVector, obj; offset = 0)
+
+Store the parameters in the object `obj` in `v`. This is typically used with `obj` as 
+an `AbstractMaterial`, an `AbstractMaterialState`, or an `AbstractTensor`. The `offset` input makes it possible 
+to write values starting at an offset location in `v`.
+
+The implementation for `AbstractTensor`s is included in the `MaterialModelsBase.jl` package, and use the Mandel
+notation for the conversion.
+"""
+function tovector! end
+
+"""
+    tovector([T::Type{<:AbstractArray}], obj)::T
+
+Out-of place version of `tovector!`. Relies on `get_vector_length` and 
+`get_vector_eltype` to be correctly defined, and defaults to `T = Array`.
+
+Experimental support for `T = SArray` is also available, but performance may be suboptimal,
+and can be improved by implementing a custom function for the given type.
+"""
+@inline tovector(obj) = tovector(Array, obj)
+
+function tovector(::Type{<:Array}, obj)
+    T = get_vector_eltype(obj)
+    return tovector!(zeros(T, get_vector_length(obj)), obj)
+end
+
+function tovector(::Type{<:SArray}, obj)
+    T = get_vector_eltype(obj)
+    N = get_vector_length(obj)
+    m = MVector{T, N}()
+    @inline tovector!(m, obj)
+    return SVector{T, N}(m)
+end
+
+"""
+    fromvector(v::AbstractVector, ::OT; offset = 0)
+
+Output an object of similar type to `OT`, but with parameters according to `v`. This is typically used with
+an `AbstractMaterial`, an `AbstractMaterialState`, or an `AbstractTensor`. The `offset` input makes it possible 
+to read values starting at an offset location in `v`. 
+
+The implementation for `AbstractTensor`s is included in the `MaterialModelsBase.jl` package, and use the Mandel
+notation for the conversion.
+"""
+function fromvector end
+
+"""
+    get_vector_length(obj)
+
+Return the length of the vector representation of `obj` when using 
+`tovector` or `tovector!`. The default implementation of `tovector` relies 
+on this function being defined.
+"""
+function get_vector_length end
+
+"""
+    get_vector_eltype(obj)
+
+Return the element type of the vector representation of `obj` when using 
+`tovector`, i.e. with `T = get_vector_eltype(obj)` and `N = get_vector_length(obj)`,
+we have `typeof(obj) == typeof(fromvector(zeros(T, N), obj))`.
+"""
+function get_vector_eltype end
 
 """
     get_tensorbase(m::AbstractMaterial)
@@ -26,67 +91,25 @@ Returns the number of independent components for the given material.
 get_num_tensorcomponents(m::AbstractMaterial) = Tensors.n_components(get_tensorbase(m))
 
 """
-    get_num_statevars(s::AbstractMaterialState)
     get_num_statevars(m::AbstractMaterial)
 
-Return the number of state variables.
-A tensorial state variable should be counted by how many components it has. 
-E.g. if a state consists of one scalar and one symmetric 2nd order tensor in 3d,
-`get_num_statevars` should return 7.
-
-It suffices to define for the state, `s`, only, but defining for material, `m`, 
-directly as well can improve performance. 
+Return the number of scalar values required to store the state of `m`, i.e. `length(tovector(initial_material_state(m)))`.
+The default implementation works provided that `s = initial_material_state(m)` and `get_vector_length(s)` is defined.
 """
-function get_num_statevars end
+function get_num_statevars(m::AbstractMaterial)
+    return get_vector_length(initial_material_state(m))
+end
 
-get_num_statevars(::NoMaterialState) = 0
-get_num_statevars(m::AbstractMaterial) = get_num_statevars(initial_material_state(m))
-
-"""
-    get_statevar_eltype(s::AbstractMaterialState)
-
-Get the type used to store each scalar component of the material state variables,
-defaults to `Float64`.
-"""
-get_statevar_eltype(::AbstractMaterialState) = Float64
-get_statevar_eltype(::NoMaterialState{T}) where {T} = T
-
-"""
-    get_num_params(m::AbstractMaterial)
-
-Return the number of material parameters in `m`. No default value implemented. 
-"""
-function get_num_params end
-
-"""
-    get_params_eltype(m::AbstractMaterial)
-
-Return the number type for the scalar material parameters, defaults to `Float64`
-"""
-get_params_eltype(::AbstractMaterial) = Float64
-
-# Conversion functions
-"""
-    tovector!(v::AbstractVector, m::AbstractMaterial; offset = 0)
-
-Put the material parameters of `m` into the vector `v`. 
-This is typically used when the parameters should be fitted.
-
-    tovector!(v::AbstractVector, s::AbstractMaterialState; offset = 0)
-
-Put the state variables in `s` into the vector `v`.
-This is typically used when differentiating the material 
-wrt. the the old state variables.
-
-    tovector!(v::AbstractVector, a::Union{SecondOrderTensor, FourthOrderTensor}; offset = 0)
-
-Puts the Mandel components of `a` into the vector `v`.
-"""
-function tovector! end
-
+# Implementations for types defined in MaterialModelsBase
 tovector!(v::AbstractVector, ::NoMaterialState; kwargs...) = v
+fromvector(::AbstractVector{T}, ::NoMaterialState; kwargs...) where {T} = NoMaterialState{T}()
+get_vector_length(::NoMaterialState) = 0
+get_vector_eltype(::NoMaterialState{T}) where {T} = T
 
 # Tensors.jl implementation
+get_vector_length(::TT) where {TT <: AbstractTensor} = Tensors.n_components(Tensors.get_base(TT))
+get_vector_eltype(a::AbstractTensor) = eltype(a)
+
 function tovector!(v::AbstractVector, a::SecondOrderTensor; offset = 0)
     return tomandel!(v, a; offset)
 end
@@ -97,22 +120,6 @@ function tovector!(v::AbstractVector, a::Union{Tensor{4, <:Any, <:Any, M}, Symme
     return v
 end
 
-"""
-    fromvector(v::AbstractVector, ::MT; offset = 0) where {MT<:AbstractMaterial}
-Create a material of type `MT` with the parameters according to `v`
-
-    fromvector(v::AbstractVector, ::ST; offset = 0) where {ST<:AbstractMaterialState}
-Create a material state of type `ST` with the values according to `v`
-
-    fromvector(v, ::TT; offset = 0) where {TT <: Union{SecondOrderTensor, FourthOrderTensor}}
-
-Create a tensor with shape of `TT` with entries from the Mandel components in `v`.
-"""
-function fromvector end
-
-fromvector(::AbstractVector{T}, ::NoMaterialState; kwargs...) where {T} = NoMaterialState{T}()
-
-# Tensors.jl implementation
 function fromvector(v::AbstractVector, ::TT; offset = 0) where {TT <: SecondOrderTensor}
     return frommandel(Tensors.get_base(TT), v; offset)
 end
@@ -123,35 +130,3 @@ function fromvector(v::AbstractVector, ::TT; offset = 0) where {TT <: FourthOrde
     N = round(Int, sqrt(M))
     return frommandel(TB, reshape(view(v, offset .+ (1:M)), (N, N)))
 end
-
-"""
-    tovector(m::AbstractMaterial)
-
-Out-of place version of `tovector!`. Relies on `get_num_params` and 
-`get_params_eltype` to be correctly defined
-"""
-function tovector(m::AbstractMaterial)
-    T = get_params_eltype(m)
-    return tovector!(zeros(T, get_num_params(m)), m)
-end
-
-"""
-    tovector(m::AbstractMaterialState)
-
-Out-of place version of `tovector!`. Relies on `get_num_statevars` and 
-`get_statevar_eltype` to be correctly defined
-"""
-function tovector(s::AbstractMaterialState)
-    T = get_statevar_eltype(s)
-    return tovector!(zeros(T, get_num_statevars(s)), s)
-end
-
-tovector(a::Union{SecondOrderTensor, FourthOrderTensor}) = (m = tomandel(a); reshape(m, length(m)))
-
-# Backwards compatibility
-const get_parameter_type = get_params_eltype
-const material2vector! = tovector!
-const material2vector = tovector
-const vector2material = fromvector
-
-export material2vector!, material2vector, vector2material

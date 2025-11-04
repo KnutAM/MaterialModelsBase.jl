@@ -25,7 +25,7 @@ export update_stress_state!                                 # For nonzero stress
 # For parameter identification and differentiation of materials
 export tovector, tovector!, fromvector                      # Convert to/from `AbstractVector`s
 export get_num_tensorcomponents, get_num_statevars          # Information about the specific material
-export get_num_params, get_params_eltype                    # 
+export get_vector_length, get_vector_eltype                 # Get the length and type when converting objects to vectors
 export MaterialDerivatives, StressStateDerivatives          # Derivative collections
 export differentiate_material!                              # Differentiation routines
 export allocate_differentiation_output                      # 
@@ -115,10 +115,10 @@ Return the (default) initial `state::AbstractMaterialState`
 of the material `m`. 
 
 Defaults to the empty `NoMaterialState{T}()`, where 
-`T = get_params_eltype(m)` (which defaults to `Float64`).
+`T = get_vector_eltype(m)` (which defaults to `Float64`).
 """
 function initial_material_state(m::AbstractMaterial)
-    T = get_params_eltype(m)
+    T = get_vector_eltype(m)
     return NoMaterialState{T}()
 end
 

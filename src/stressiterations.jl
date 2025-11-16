@@ -25,7 +25,8 @@ See also [`ReducedStressState`](@ref).
 material_response(::AbstractStressState, ::AbstractMaterial, args...)
 
 @inline function material_response(stress_state::AbstractStressState, m::AbstractMaterial, args::Vararg{Any,N}) where N
-    return reduced_material_response(stress_state, m, args...)
+    σ, dσdϵ, state, ϵ_full = stress_state_material_response(stress_state, m, args...)
+    return reduce_tensordim(stress_state, σ), reduce_stiffness(stress_state, dσdϵ), state, ϵ_full
 end
 
 update_stress_state!(::AbstractStressState, σ) = nothing
@@ -37,8 +38,8 @@ Creates a subtype of `AbstractMaterial` that wraps a stress state and a material
 calls to `material_response(w::ReducedStressState, args...)` gives the same result as 
 `material_response(s, m, args...)`. 
 Calls to `initial_material_state`, `allocate_material_cache`, 
-`get_num_tensorcomponents`, `get_num_statevars`, `get_num_params`, 
-`get_params_eltype`, `tovector!`, `tovector`, 
+`get_num_tensorcomponents`, `get_num_statevars`, `get_vector_length`, 
+`get_vector_eltype`, `tovector!`, `tovector`, 
 and `allocate_differentiation_output` are forwarded with `m` as the argument. 
 `fromvector` returns `ReducedStressState` and is supported as well.
 """
@@ -47,8 +48,8 @@ struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: Abstrac
     material::M
 end
 for op in ( :initial_material_state, :allocate_material_cache, 
-            :get_num_tensorcomponents, :get_num_statevars, :get_num_params, 
-            :get_params_eltype, :allocate_differentiation_output)
+            :get_num_tensorcomponents, :get_num_statevars, :get_vector_length, 
+            :get_vector_eltype, :allocate_differentiation_output)
     @eval @inline $op(rss::ReducedStressState) = $op(rss.material)
 end
 function tovector!(v::AbstractVector, rss::ReducedStressState)
@@ -168,7 +169,7 @@ get_tolerance(ss::UniaxialNormalStress) = get_tolerance(ss.settings)
 get_max_iter(ss::UniaxialNormalStress) = get_max_iter(ss.settings)
 
 """
-    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3,Bool}; kwargs...)
+    GeneralStressState(σ_ctrl::AbstractTensor{2,3,Bool}, σ::AbstractTensor{2,3}; kwargs...)
 
 Construct a general stress state controlled by `σ_ctrl` whose component is `true` if that 
 component is stress-controlled and `false` if it is strain-controlled. If stress-controlled,
@@ -252,15 +253,15 @@ reduce_tensordim(::Val{dim}, a::SymmetricTensor{2}) where dim = SymmetricTensor{
 reduce_tensordim(::Val{dim}, A::SymmetricTensor{4}) where dim = SymmetricTensor{4,dim}((i,j,k,l)->A[i,j,k,l])
 
 
-function reduced_material_response(stress_state::NoIterationState, 
+function stress_state_material_response(stress_state::NoIterationState, 
         m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where N
 
     ϵ_full = expand_tensordim(stress_state, ϵ)
     σ, dσdϵ, new_state = material_response(m, ϵ_full, args...)
-    return reduce_tensordim(stress_state, σ), reduce_tensordim(stress_state, dσdϵ), new_state, ϵ_full
+    return σ, dσdϵ, new_state, ϵ_full
 end
 
-function reduced_material_response(stress_state::IterationState, 
+function stress_state_material_response(stress_state::IterationState, 
         m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where N
 
     # Newton options
@@ -274,8 +275,7 @@ function reduced_material_response(stress_state::IterationState,
         σ_mandel = get_unknowns(stress_state, σ_full)
 
         if norm(σ_mandel) < tol
-            dσdϵ = reduce_stiffness(stress_state, dσdϵ_full)
-            return reduce_tensordim(stress_state, σ_full), dσdϵ, new_state, ϵ_full
+            return σ_full, dσdϵ_full, new_state, ϵ_full
         end
 
         dσdϵ_mandel = get_unknowns(stress_state, dσdϵ_full)
@@ -284,12 +284,20 @@ function reduced_material_response(stress_state::IterationState,
     throw(NoStressConvergence("Stress iterations with the NewtonSolver did not converge"))
 end
 
-reduce_stiffness(::State3D, dσdϵ_full::AbstractTensor{4,3}) = dσdϵ_full
+reduce_stiffness(ss::State3D, dσdϵ_full) = reduce_stiffness(Val(3), ss, dσdϵ_full)
+reduce_stiffness(ss::State2D, dσdϵ_full) = reduce_stiffness(Val(2), ss, dσdϵ_full)
+reduce_stiffness(ss::State1D, dσdϵ_full) = reduce_stiffness(Val(1), ss, dσdϵ_full)
 
-function reduce_stiffness(stress_state, dσdϵ_full::AbstractTensor{4,3})
+reduce_stiffness(::Val{3}, ::State3D, dσdϵ_full::AbstractTensor{4,3}) = dσdϵ_full
+
+function reduce_stiffness(::Union{Val{1}, Val{2}}, stress_state::IterationState, dσdϵ_full::AbstractTensor{4,3})
     ∂σᶠ∂ϵᶠ, ∂σᶠ∂ϵᶜ, ∂σᶜ∂ϵᶠ, ∂σᶜ∂ϵᶜ = extract_substiffnesses(stress_state, dσdϵ_full)
     dσᶜdϵᶜ = ∂σᶜ∂ϵᶜ - ∂σᶜ∂ϵᶠ * (∂σᶠ∂ϵᶠ \ ∂σᶠ∂ϵᶜ)
     return convert_stiffness(dσᶜdϵᶜ, stress_state, dσdϵ_full)
+end
+
+function reduce_stiffness(::Union{Val{1}, Val{2}}, stress_state::NoIterationState, dσdϵ_full::AbstractTensor{4,3})
+    return reduce_tensordim(stress_state, dσdϵ_full)
 end
 
 convert_stiffness(dσᶜdϵᶜ::SMatrix{1,1}, ::State1D, ::SymmetricTensor) = frommandel(SymmetricTensor{4,1}, dσᶜdϵᶜ)
@@ -404,24 +412,31 @@ end
 
 # GeneralStressState
 function get_full_tensor(state::GeneralStressState{Nσ}, ::TT, v::SVector{Nσ,T}) where {Nσ,T,TT}
-    shear_factor = T(1/√2)
+    TB = Tensors.get_base(TT)
+    shear_factor = if TB == SymmetricTensor{2,3}
+        T(1/√2)
+    elseif TB == Tensor{2,3}
+        one(T)
+    else
+        error("GeneralStressState expects full dimension of strain input")
+    end
     s(i,j) = i==j ? one(T) : shear_factor
     f(i,j) = state.σ_ctrl[i,j] ? v[state.σ_minds[i,j]]*s(i,j) : zero(T)
-    return Tensors.get_base(TT)(f)
+    return TB(f)
 end
 
 function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}) where {Nσ, T}
-    shear_factor = T(√2)
+    shear_factor = a isa SymmetricTensor ? T(√2) : one(T)
     s(i,j) = i==j ? one(T) : shear_factor
     f(c) = ((i,j) = c; s(i,j)*(a[i,j]-state.σ[i,j]))
-    return SVector{Nσ}((f(c) for c in state.σm_inds))
+    return SVector{Nσ,T}((f(c) for c in state.σm_inds))
 end
 
 function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{4,3,T}) where {Nσ,T}
-    shear_factor = T(√2)
+    shear_factor = a isa SymmetricTensor ? T(√2) : one(T)
     s(i,j) = i==j ? one(T) : shear_factor
     f(c1,c2) = ((i,j) = c1; (k,l) = c2; a[i,j,k,l]*s(i,j)*s(k,l))
-    return SMatrix{Nσ,Nσ}((f(c1,c2) for c1 in state.σm_inds, c2 in state.σm_inds))
+    return SMatrix{Nσ,Nσ,T}((f(c1,c2) for c1 in state.σm_inds, c2 in state.σm_inds))
 end
 
 # Extract each part of the stiffness tensor as SMatrix

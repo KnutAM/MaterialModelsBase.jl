@@ -1,5 +1,6 @@
 module MaterialModelsBase
 using Tensors, StaticArrays
+using ForwardDiff: ForwardDiff
 import Base: @kwdef
 
 # General interface for <:AbstractMaterial
@@ -24,8 +25,9 @@ export update_stress_state!                                 # For nonzero stress
 # For parameter identification and differentiation of materials
 export tovector, tovector!, fromvector                      # Convert to/from `AbstractVector`s
 export get_num_tensorcomponents, get_num_statevars          # Information about the specific material
-export get_num_params, get_params_eltype                    # 
-export MaterialDerivatives, differentiate_material!         # Differentiation routines
+export get_vector_length, get_vector_eltype                 # Get the length and type when converting objects to vectors
+export MaterialDerivatives, StressStateDerivatives          # Derivative collections
+export differentiate_material!                              # Differentiation routines
 export allocate_differentiation_output                      # 
 
 abstract type AbstractMaterial end
@@ -112,14 +114,16 @@ end
 Return the (default) initial `state::AbstractMaterialState` 
 of the material `m`. 
 
-Defaults to the empty `NoMaterialState()`
+Defaults to the empty `NoMaterialState{T}()`, where 
+`T = get_vector_eltype(m)` (which defaults to `Float64`).
 """
-function initial_material_state(::AbstractMaterial) 
-    return NoMaterialState()
+function initial_material_state(m::AbstractMaterial)
+    T = get_vector_eltype(m)
+    return NoMaterialState{T}()
 end
 
 abstract type AbstractMaterialState end
-struct NoMaterialState <: AbstractMaterialState end
+struct NoMaterialState{T} <: AbstractMaterialState end
 
 # Material cache 
 """
@@ -153,8 +157,8 @@ abstract type AbstractExtraOutput end
 struct NoExtraOutput <: AbstractExtraOutput end
 
 include("vector_conversion.jl")
-include("differentiation.jl")
 include("stressiterations.jl")
+include("differentiation.jl")
 include("ErrorExceptions.jl")
 
 end

@@ -1,18 +1,27 @@
 all_states = (
     FullStressState(), UniaxialStrain(), PlaneStrain(),
     UniaxialStress(), PlaneStress(), UniaxialNormalStress())
-iter_states = ( UniaxialStress(), PlaneStress(), UniaxialNormalStress())
+gss_ctrl = SymmetricTensor{2,3,Bool}((true, true, falses(4)...))
+iter_states = ( UniaxialStress(), PlaneStress(), UniaxialNormalStress(), 
+                (SymmetricTensor = GeneralStressState(gss_ctrl, 0.0 * gss_ctrl),
+                 Tensor = GeneralStressState(Tensor{2,3}(gss_ctrl), 0.0 * Tensor{2,3}(gss_ctrl)))
+                 )
 iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
                 ([3,4,5,7,8], [3,4,5]),
-                ([2,3], [2,3]))
-
+                ([2,3], [2,3]),
+                ([1,6,9], [1,6]))
 
 @testset "conversions" begin
     # Test that
     # 1) All conversions are invertible (convert back and fourth)
     # 2) Are compatible with the expected mandel dynamic tensors 
-    for stress_state in all_states
+    for _stress_state in all_states
         for TT in (Tensor, SymmetricTensor)
+            stress_state = if isa(_stress_state, NamedTuple)
+                _stress_state[nameof(TT)]
+            else
+                _stress_state
+            end
             ared = rand(TT{2,_getdim(stress_state)})
             afull = MMB.expand_tensordim(stress_state, ared)
             @test _getdim(afull) == 3    # Full dimensional tensor
@@ -26,8 +35,13 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
         end
     end
 
-    for (state, inds) in zip(iter_states, iter_mandel)
+    for (_stress_state, inds) in zip(iter_states, iter_mandel)
         for (TT, ii) in zip((Tensor, SymmetricTensor), inds)
+            state = if isa(_stress_state, NamedTuple)
+                _stress_state[nameof(TT)]
+            else
+                _stress_state
+            end
             a = rand(TT{2,3})
             A = rand(TT{4,3})
             ax = MMB.get_unknowns(state, a)
@@ -46,8 +60,13 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
 end
 
 @testset "stiffness_calculations" begin
-    for (state, inds) in zip(iter_states, iter_mandel)
+    for (_stress_state, inds) in zip(iter_states, iter_mandel)
         for (TT, ii) in zip((Tensor, SymmetricTensor), inds)
+            state = if isa(_stress_state, NamedTuple)
+                _stress_state[nameof(TT)]
+            else
+                _stress_state
+            end
             dσdϵ = rand(TT{4,3}) + one(TT{4,3})
             dσᶜdϵᶜ = MMB.reduce_stiffness(state, dσdϵ)
             if _getdim(state) < 3   # Otherwise, conversion is direct    
@@ -150,30 +169,29 @@ end
 
     Δϵ = 1e-6   # Small strain to compare with linear case
     rtol = 1e-5 # Relative tolerance to compare with linear case
-    @testset for m in (StVenant(;G, K), NeoHooke(;G, K))
-        old = initial_material_state(m)
-        # UniaxialStress
-        P, dPdF, state, Ffull = material_response(UniaxialStress(), m, Tensor{2,1}((1 + Δϵ,)), old, 0.0)
-        @test isapprox(P[1,1], E*Δϵ; rtol)
-        @test isapprox(dPdF[1,1,1,1], E; rtol)
-        @test Ffull[2,2] ≈ Ffull[3,3]
-        @test Ffull[2,2] ≈ 1-ν*Δϵ
-        
-        # UniaxialStrain
-        P, dPdF, state, Ffull = material_response(UniaxialStrain(), m, Tensor{2,1}((1 + Δϵ,)), old, 0.0)
-        @test isapprox(P[1,1], (2G+λ)*Δϵ; rtol)
-        @test isapprox(dPdF[1,1,1,1], (2G+λ); rtol)
-        P_full, dPdF_full, _ = material_response(m, Ffull, old, 0.0)
-        @test isapprox(P_full[2,2], λ*Δϵ; rtol)
+    m = NeoHooke(;G, K)
+    old = initial_material_state(m)
+    # UniaxialStress
+    P, dPdF, state, Ffull = material_response(UniaxialStress(), m, Tensor{2,1}((1 + Δϵ,)), old, 0.0)
+    @test isapprox(P[1,1], E*Δϵ; rtol)
+    @test isapprox(dPdF[1,1,1,1], E; rtol)
+    @test Ffull[2,2] ≈ Ffull[3,3]
+    @test Ffull[2,2] ≈ 1-ν*Δϵ
+    
+    # UniaxialStrain
+    P, dPdF, state, Ffull = material_response(UniaxialStrain(), m, Tensor{2,1}((1 + Δϵ,)), old, 0.0)
+    @test isapprox(P[1,1], (2G+λ)*Δϵ; rtol)
+    @test isapprox(dPdF[1,1,1,1], (2G+λ); rtol)
+    P_full, dPdF_full, _ = material_response(m, Ffull, old, 0.0)
+    @test isapprox(P_full[2,2], λ*Δϵ; rtol)
 
-        # PlaneStress
-        ϵ = Δϵ * rand(SymmetricTensor{2,2})
-        F = one(Tensor{2,2}) + ϵ
-        P, dPdF, state, Ffull = material_response(PlaneStress(), m, F, old, 0.0)
-        Dvoigt = (E/(1-ν^2))*[1 ν 0; ν 1 0; 0 0 (1-ν)/2]
-        @test isapprox(tovoigt(symmetric(dPdF)), Dvoigt; rtol)
-        @test isapprox(P, fromvoigt(SymmetricTensor{4,2}, Dvoigt)⊡ϵ; rtol)
-    end
+    # PlaneStress
+    ϵ = Δϵ * rand(SymmetricTensor{2,2})
+    F = one(Tensor{2,2}) + ϵ
+    P, dPdF, state, Ffull = material_response(PlaneStress(), m, F, old, 0.0)
+    Dvoigt = (E/(1-ν^2))*[1 ν 0; ν 1 0; 0 0 (1-ν)/2]
+    @test isapprox(tovoigt(symmetric(dPdF)), Dvoigt; rtol)
+    @test isapprox(P, fromvoigt(SymmetricTensor{4,2}, Dvoigt)⊡ϵ; rtol)
 end
 
 @testset "visco_elastic" begin

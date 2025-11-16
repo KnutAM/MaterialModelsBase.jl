@@ -4,15 +4,21 @@ authors = ["Knut Andreas Meyer and contributors"]
 version = "0.2.4"
 
 [deps]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 
 [compat]
-julia = "1.8"
+julia = "1.11"
 
 [extras]
-ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
+MaterialModelsTesting = "882b014b-b96c-4115-8629-e17fb35110d2"
+
+[sources]
+MaterialModelsTesting = {url = "https://github.com/KnutAM/MaterialModelsTesting.jl"}
+#MaterialModelsTesting = {path = "/Users/knutan/.julia/dev/MaterialModelsTesting"}
 
 [targets]
-test = ["Test", "ForwardDiff"]
+test = ["Test", "FiniteDiff", "MaterialModelsTesting"]

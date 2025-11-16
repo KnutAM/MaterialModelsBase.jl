@@ -1,2 +1,5 @@
 [files]
 extend-exclude = ["*.toml"]
+
+[default.extend-words]
+OT = "OT"

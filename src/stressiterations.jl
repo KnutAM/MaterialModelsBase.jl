@@ -47,7 +47,7 @@ struct ReducedStressState{S<:AbstractStressState,M<:AbstractMaterial} <: Abstrac
     stress_state::S
     material::M
 end
-for op in ( :initial_material_state, :allocate_material_cache, 
+for op in ( :initial_material_state, :allocate_material_cache, :get_tensorbase,
             :get_num_tensorcomponents, :get_num_statevars, :get_vector_length, 
             :get_vector_eltype, :allocate_differentiation_output)
     @eval @inline $op(rss::ReducedStressState) = $op(rss.material)

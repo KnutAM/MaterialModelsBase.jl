@@ -27,7 +27,7 @@ export tovector, tovector!, fromvector                      # Convert to/from `A
 export get_num_tensorcomponents, get_num_statevars          # Information about the specific material
 export get_vector_length, get_vector_eltype                 # Get the length and type when converting objects to vectors
 export MaterialDerivatives, StressStateDerivatives          # Derivative collections
-export differentiate_material!                              # Differentiation routines
+export differentiate_material!, reset_derivatives!          # Differentiation routines
 export allocate_differentiation_output                      # 
 
 abstract type AbstractMaterial end

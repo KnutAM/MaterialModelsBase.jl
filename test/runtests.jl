@@ -1,5 +1,6 @@
 using MaterialModelsBase
 using Test
+using Random
 using Tensors, StaticArrays
 import MaterialModelsBase as MMB
 using FiniteDiff: FiniteDiff

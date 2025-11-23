@@ -128,11 +128,12 @@ is defined already.
 """
 function StressStateDerivatives(::AbstractStressState, m::AbstractMaterial)
     mderiv = MaterialDerivatives(m)
+    T = get_vector_eltype(m)
     np = get_vector_length(m)
     nt = get_num_tensorcomponents(m) # Should be changed to only save non-controlled entries
     # Filled with `NaN`s to ensure we don't rely on these being defined.
-    dϵdp = fill(NaN, nt, np)
-    dσdp = fill(NaN, nt, np)
+    dϵdp = fill(T(NaN), nt, np)
+    dσdp = fill(T(NaN), nt, np)
     # TODO: Should be changed to only save non-controlled entries
     vo = Tensors.DEFAULT_VOIGT_ORDER[3]
     if nt == 6

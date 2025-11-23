@@ -15,10 +15,11 @@ julia = "1.11"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 MaterialModelsTesting = "882b014b-b96c-4115-8629-e17fb35110d2"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [sources]
 MaterialModelsTesting = {url = "https://github.com/KnutAM/MaterialModelsTesting.jl"}
 #MaterialModelsTesting = {path = "/Users/knutan/.julia/dev/MaterialModelsTesting"}
 
 [targets]
-test = ["Test", "FiniteDiff", "MaterialModelsTesting"]
+test = ["Test", "FiniteDiff", "MaterialModelsTesting", "Random"]

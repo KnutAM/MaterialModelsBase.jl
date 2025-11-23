@@ -29,10 +29,8 @@ where `σ` is the stress, `ϵ` the strain, `s` and `ⁿs` are the current
 and old state variables, and `p` the material parameter vector.
 
 * `dσdϵ`
-* `dσdⁿs`
 * `dσdp`
 * `dsdϵ`
-* `dsdⁿs`
 * `dsdp`
 
 """
@@ -48,6 +46,25 @@ function MaterialDerivatives(m::AbstractMaterial)
         zeros(T, n_state, n_tensor),   # dsdϵ
         dsdp
         )
+end
+
+function reset_derivatives!(md::MaterialDerivatives, m::AbstractMaterial)
+    # User controls derivative calculation: reset properly
+    fill!(md.dσdϵ, 0)
+    fill!(md.dσdp, 0)
+    fill!(md.dsdϵ, 0)
+    s_from_p(p) = tovector(initial_material_state(fromvector(p, m)))
+    ForwardDiff.jacobian!(md.dsdp, s_from_p, tovector(m)) # The only that is normally required
+    return md
+end
+
+function reset_derivatives!(md::MaterialDerivatives, md_prev::MaterialDerivatives)
+    # User controls derivative calculation: reset properly
+    copy!(md.dσdϵ, md_prev.dσdϵ)
+    copy!(md.dσdp, md_prev.dσdp)
+    copy!(md.dsdϵ, md_prev.dsdϵ)
+    copy!(md.dsdp, md_prev.dsdp) # The only that is normally required
+    return md
 end
 
 """
@@ -101,13 +118,22 @@ struct StressStateDerivatives{T}
     # TODO: Reduce the dimensions, for now all entries (even those that are zero) are stored.
 end
 
+"""
+    StressStateDerivatives(stress_state::AbstractStressState, m::AbstractMaterial)
+
+Create `ssd::StressStateDerivatives` object that allows differentiating the material response wrt material
+parameters through the `differentiate_material!(ssd, args...)` function. For standard 3d implementations of `m`, defining
+`material_response(m)` and `differentiate_material!(::MaterialDerivatives, m, args...)`, `differentiate_material!(ssd, args...)`
+is defined already.
+"""
 function StressStateDerivatives(::AbstractStressState, m::AbstractMaterial)
     mderiv = MaterialDerivatives(m)
     np = get_vector_length(m)
     nt = get_num_tensorcomponents(m) # Should be changed to only save non-controlled entries
-    dϵdp = zeros(nt, np)
-    dσdp = zeros(nt, np)
-    # Should be changed to only save non-controlled entries
+    # Filled with `NaN`s to ensure we don't rely on these being defined.
+    dϵdp = fill(NaN, nt, np)
+    dσdp = fill(NaN, nt, np)
+    # TODO: Should be changed to only save non-controlled entries
     vo = Tensors.DEFAULT_VOIGT_ORDER[3]
     if nt == 6
         index = SMatrix{3, 3, Int}(min(vo[i, j], vo[j, i]) for i in 1:3, j in 1:3)
@@ -115,6 +141,19 @@ function StressStateDerivatives(::AbstractStressState, m::AbstractMaterial)
         index = SMatrix{3, 3, Int}(vo)
     end
     return StressStateDerivatives(mderiv, dϵdp, dσdp, index, index)
+end
+
+function reset_derivatives!(sd::StressStateDerivatives, m::AbstractMaterial)
+    reset_derivatives!(sd.mderiv, m)
+    fill!(sd.dϵdp, NaN)
+    fill!(sd.dσdp, NaN)
+    return sd
+end
+function reset_derivatives!(sd::StressStateDerivatives, sd_prev::StressStateDerivatives)
+    reset_derivatives!(sd.mderiv, sd_prev.mderiv)
+    fill!(sd.dϵdp, NaN)
+    fill!(sd.dσdp, NaN)
+    return sd
 end
 
 function differentiate_material!(ssd::StressStateDerivatives, stress_state::AbstractStressState, m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where {N}
@@ -134,6 +173,26 @@ function differentiate_material!(ssd::StressStateDerivatives, stress_state::Abst
     end
     return reduce_tensordim(stress_state, σ_full), reduce_stiffness(stress_state, dσdϵ_full), state, ϵ_full
 end
+
+"""
+    reset_derivatives!(d::Union{MaterialDerivatives, StressStateDerivatives}, m::AbstractMaterial)
+
+Reset the derivatives to match the initial derivatives after construction of `d` with the material `m`.
+
+    reset_derivatives!(d::MaterialDerivatives, dprev::MaterialDerivatives)
+    reset_derivatives!(d::StressStateDerivatives, dprev::StressStateDerivatives)
+
+Reset the `MaterialDerivatives` to match the continuation from a previous set of derivatives.
+I.e. setting the values equal to the previous derivatives.
+
+!!! warning "StressStateDerivatives"
+    The `StressStateDerivatives` fields `dϵdp` and `dσdp` are not updated (these could be different due to
+    different stress states in the different steps), and are set to `NaN`s. This means that implementations
+    of `differentiate_material!(ssd::StressStateDerivatives, args...)` should not depend on the values stored
+    in these field (i.e. write-only). The default implementation that should be used in most cases fulfills this.
+
+"""
+function reset_derivatives! end
 
 """
     stress_controlled_indices(stress_state::AbstractStressState, ::AbstractTensor)::SVector{N, Int}

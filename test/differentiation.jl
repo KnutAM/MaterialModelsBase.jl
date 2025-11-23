@@ -90,4 +90,36 @@ end
             end
         end
     end
+    function fillrand!(s::T) where {T}
+        for k in fieldnames(T)
+            rand!(getfield(s, k))
+        end
+    end
+    function compare_structs(f::Function, s1::T, s2::T) where {T}
+        for k in fieldnames(T)
+            compare_structs(f, getfield(s1, k), getfield(s2, k))
+        end
+    end
+    function compare_structs(f::Function, a1::T, a2::T) where {T <: Union{<:AbstractArray, <:Number}}
+        f(a1, a2)
+    end
+    @testset "Reset functionality" begin
+        m = ViscoElastic(LinearElastic(0.52, 0.77), LinearElastic(0.33, 0.54), 0.36)
+        for ss in (PlaneStress(), UniaxialStress(), UniaxialNormalStress())
+            ssd = StressStateDerivatives(ss, m)
+            ssd2 = StressStateDerivatives(ss, m)
+            fillrand!(ssd2.mderiv)
+            reset_derivatives!(ssd2, m)
+            compare_structs(ssd, ssd2) do a1, a2
+                @test a1 == a2 || (all(isnan, a1) && all(isnan, a2))
+            end
+            compare_structs(==, ssd.mderiv, ssd2.mderiv)
+            fillrand!(ssd.mderiv)
+            reset_derivatives!(ssd2, ssd)
+            compare_structs(ssd, ssd2) do a1, a2
+                @test a1 == a2 || (all(isnan, a1) && all(isnan, a2))
+            end
+            compare_structs(==, ssd.mderiv, ssd2.mderiv)
+        end
+    end
 end

@@ -11,6 +11,7 @@ Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 [sources]
 MaterialModelsTesting = {url = "https://github.com/KnutAM/MaterialModelsTesting.jl"}
 MechanicalMaterialModels = {url = "https://github.com/KnutAM/MechanicalMaterialModels.jl"}
+Newton = {url = "https://github.com/KnutAM/Newton.jl"}
 
 [compat]
 julia = "1.11"
@@ -19,8 +20,10 @@ julia = "1.11"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 MaterialModelsTesting = "882b014b-b96c-4115-8629-e17fb35110d2"
 MechanicalMaterialModels = "b3282f9b-607f-4337-ab95-e5488ab5652c"
+Newton = "83aa5b51-0588-403c-85e4-434ec185aae7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
+
 [targets]
-test = ["Test", "FiniteDiff", "MaterialModelsTesting", "MechanicalMaterialModels", "Random"]
+test = ["FiniteDiff", "MaterialModelsTesting", "MechanicalMaterialModels", "Newton", "Random", "Test"]

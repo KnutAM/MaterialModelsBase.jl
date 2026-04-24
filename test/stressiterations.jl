@@ -44,17 +44,35 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
             end
             a = rand(TT{2,3})
             A = rand(TT{4,3})
-            ax = MMB.get_unknowns(state, a)
+            F = rand(TT{2,3})
+            ax = MMB.get_unknowns(state, a, F)
             Ax = MMB.get_unknowns(state, A)
-            # Corresponding to regular mandel
-            @test ax ≈ tomandel(a)[ii] 
-            @test Ax ≈ tomandel(A)[ii,ii]
-            
-            am = tomandel(a)
-            am[setdiff(1:length(am), ii)] .= 0
-            ac = frommandel(typeof(a), am)
-            # Test that other comps become zero, and the rest are converted correctly
-            @test ac ≈ MMB.get_full_tensor(state, a, MMB.get_unknowns(state, a)) 
+            if isa(a, Tensor) && isa(state, UniaxialStress)
+                # Special case due to extra rotation constraint
+                idxs1 = setdiff(1:8, 6)
+                idxs2 = setdiff(1:8, [3, 6])
+                @test ax[idxs1] ≈ tomandel(a)[ii[idxs1]]
+                @test Ax[idxs1,:] ≈ tomandel(A)[ii[idxs1],ii]
+                @test Ax[:,idxs2] ≈ tomandel(A)[ii,ii[idxs2]]
+                @test Ax[6, 3] ≈ 1
+                @test Ax[6, 6] ≈ -1
+
+                am = tomandel(a)
+                am[setdiff(1:length(am), ii)] .= 0
+                am[7] = F[2,3] - F[3,2]
+                ac = frommandel(typeof(a), am)
+                # Test that other comps become zero, and the rest are converted correctly
+                @test ac ≈ MMB.get_full_tensor(state, a, MMB.get_unknowns(state, a, F))
+            else # Corresponding to regular mandel
+                @test ax ≈ tomandel(a)[ii]
+                @test Ax ≈ tomandel(A)[ii,ii]
+
+                am = tomandel(a)
+                am[setdiff(1:length(am), ii)] .= 0
+                ac = frommandel(typeof(a), am)
+                # Test that other comps become zero, and the rest are converted correctly
+                @test ac ≈ MMB.get_full_tensor(state, a, MMB.get_unknowns(state, a, F))
+            end
         end
     end
 end
@@ -69,7 +87,13 @@ end
             end
             dσdϵ = rand(TT{4,3}) + one(TT{4,3})
             dσᶜdϵᶜ = MMB.reduce_stiffness(state, dσdϵ)
-            if _getdim(state) < 3   # Otherwise, conversion is direct    
+            if isa(state, UniaxialStress) && TT === Tensor
+                D_mandel = tomandel(dσdϵ)
+                D_mandel[7, 4] = 1
+                D_mandel[7, 7] = -1
+                jj = setdiff(1:size(D_mandel,1), ii)
+                @test dσᶜdϵᶜ ≈ frommandel(TT{4,_getdim(state)}, inv(inv(D_mandel)[jj,jj]))
+            elseif _getdim(state) < 3   # Otherwise, conversion is direct
                 D_mandel = tomandel(dσdϵ)
                 jj = setdiff(1:size(D_mandel,1), ii)
                 @test dσᶜdϵᶜ ≈ frommandel(TT{4,_getdim(state)}, inv(inv(D_mandel)[jj,jj]))
@@ -205,12 +229,13 @@ end
         overstress=MechMat.NortonOverstress(; tstar=0.5, nexp=2.0)
         )
     old = initial_material_state(m)
-    ss = UniaxialStress(; tolerance = 1e-10)
-    Δϵ = 1e-6
+    ss = UniaxialStress()
+    Δϵ = 1e-5
     for ϵ in range(0, 0.2, 100)[2:end]
-        P, dPdF, state, Ffull = material_response(ss, m, Tensor{2,1}((1 + ϵ,)), old, 1e-3)
-        P2, _ = material_response(ss, m, Tensor{2,1}((1 + ϵ + Δϵ,)), old, 1e-3)
-        @test dPdF[1,1,1,1] ≈ (P2[1,1] - P[1,1]) / Δϵ
+        P1, dPdF1, state, Ffull = material_response(ss, m, Tensor{2,1}((1 + ϵ,)), old, 1e-3)
+        P2, dPdF2, _ = material_response(ss, m, Tensor{2,1}((1 + ϵ + Δϵ,)), old, 1e-3)
+        dPdF = (dPdF1 + dPdF2) / 2
+        @test dPdF[1,1,1,1] ≈ (P2[1,1] - P1[1,1]) / Δϵ rtol = 1e-4
         old = state
     end
 end

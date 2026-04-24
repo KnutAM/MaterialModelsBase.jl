@@ -272,7 +272,7 @@ function stress_state_material_response(stress_state::IterationState,
 
     for _ in 1:maxiter
         σ_full, dσdϵ_full, new_state = material_response(m, ϵ_full, args...)
-        σ_mandel = get_unknowns(stress_state, σ_full)
+        σ_mandel = get_unknowns(stress_state, σ_full, ϵ_full)
 
         if norm(σ_mandel) < tol
             return σ_full, dσdϵ_full, new_state, ϵ_full
@@ -319,7 +319,7 @@ function get_full_tensor(::UniaxialStress, ::SymmetricTensor, v::SVector{5,T}) w
     s = T(1/√2)        # 11,   21,     31,     22,   32,     33
     SymmetricTensor{2,3}((0, v[5]*s, v[4]*s, v[1], v[3]*s, v[2]))
 end
-function get_unknowns(::UniaxialStress, a::SymmetricTensor{2,3})
+function get_unknowns(::UniaxialStress, a::SymmetricTensor{2,3}, args...)
     SVector{5}(a[2,2], a[3,3], a[3,2]*√2, a[3,1]*√2, a[2,1]*√2)
 end
 function get_unknowns(::UniaxialStress, A::SymmetricTensor{4, 3}) 
@@ -338,17 +338,22 @@ function get_full_tensor(::UniaxialStress, ϵ::Tensor, v::SVector{8})
     return Tensor{2,3}((0, v[8], v[7], v[5], v[1], v[6], v[4], v[3], v[2]))
 end
 
-function get_unknowns(::UniaxialStress, a::Tensor{2,3})
-    SVector{8}(a[2,2], a[3,3], a[2,3], a[1,3], a[1,2], a[3,2], a[3,1], a[2,1])
+function get_unknowns(::UniaxialStress, P::Tensor{2,3}, F::Tensor{2,3})
+    # Replace P[3,2] = 0 with F[2,3] - F[3,2] = 0
+    SVector{8}(P[2,2], P[3,3], P[2,3], P[1,3], P[1,2], F[2,3] - F[3,2], P[3,1], P[2,1])
 end
 
-function get_unknowns(::UniaxialStress, A::Tensor{4, 3}) 
+function get_unknowns(::UniaxialStress, A::Tensor{4, 3, T}) where {T}
+    # A = dPdF
+    # Replacement of P[3,2] = 0 with F[2,3] - F[3,2] = 0, gives
+    # A[3,2,2,3] =>  1
+    # A[3,2,3,2] => -1
     @SMatrix [  A[2,2,2,2] A[2,2,3,3] A[2,2,2,3] A[2,2,1,3] A[2,2,1,2] A[2,2,3,2] A[2,2,3,1] A[2,2,2,1];
                 A[3,3,2,2] A[3,3,3,3] A[3,3,2,3] A[3,3,1,3] A[3,3,1,2] A[3,3,3,2] A[3,3,3,1] A[3,3,2,1];
                 A[2,3,2,2] A[2,3,3,3] A[2,3,2,3] A[2,3,1,3] A[2,3,1,2] A[2,3,3,2] A[2,3,3,1] A[2,3,2,1];
                 A[1,3,2,2] A[1,3,3,3] A[1,3,2,3] A[1,3,1,3] A[1,3,1,2] A[1,3,3,2] A[1,3,3,1] A[1,3,2,1];
                 A[1,2,2,2] A[1,2,3,3] A[1,2,2,3] A[1,2,1,3] A[1,2,1,2] A[1,2,3,2] A[1,2,3,1] A[1,2,2,1];
-                A[3,2,2,2] A[3,2,3,3] A[3,2,2,3] A[3,2,1,3] A[3,2,1,2] A[3,2,3,2] A[3,2,3,1] A[3,2,2,1];
+                A[3,2,2,2] A[3,2,3,3]   one(T)   A[3,2,1,3] A[3,2,1,2]   -one(T)  A[3,2,3,1] A[3,2,2,1];
                 A[3,1,2,2] A[3,1,3,3] A[3,1,2,3] A[3,1,1,3] A[3,1,1,2] A[3,1,3,2] A[3,1,3,1] A[3,1,2,1];
                 A[2,1,2,2] A[2,1,3,3] A[2,1,2,3] A[2,1,1,3] A[2,1,1,2] A[2,1,3,2] A[2,1,3,1] A[2,1,2,1]]
 end
@@ -361,7 +366,7 @@ function get_full_tensor(::PlaneStress, ::SymmetricTensor, v::SVector{3,T}) wher
     s = T(1/√2)        # 11,21,   31,  22,   32,     33
     SymmetricTensor{2,3}((0, 0, v[3]*s, 0, v[2]*s, v[1]))
 end
-function get_unknowns(::PlaneStress, a::SymmetricTensor{2,3})
+function get_unknowns(::PlaneStress, a::SymmetricTensor{2,3}, args...)
     SVector{3}(a[3,3], a[2,3]*√2, a[3,1]*√2)
 end
 function get_unknowns(::PlaneStress, A::SymmetricTensor{4, 3}) 
@@ -378,7 +383,7 @@ function get_full_tensor(::PlaneStress, ϵ::Tensor, v::SVector{5})
     return Tensor{2,3}((0, 0, v[5], 0, 0, v[4], v[3], v[2], v[1]))
 end
 
-function get_unknowns(::PlaneStress, a::Tensor{2,3})
+function get_unknowns(::PlaneStress, a::Tensor{2,3}, args...)
     SVector{5}(a[3,3], a[2,3], a[1,3], a[3,2], a[3,1])
 end
 
@@ -402,7 +407,7 @@ function get_full_tensor(::UniaxialNormalStress, ϵ::Tensor, v::SVector{2})
                  # 11,21,31,12,   22,32,13,23,  33
 return Tensor{2,3}((0, 0, 0, 0, v[1], 0, 0, 0, v[2]))
 end
-function get_unknowns(::UniaxialNormalStress, a::AbstractTensor{2,3})
+function get_unknowns(::UniaxialNormalStress, a::AbstractTensor{2,3}, args...)
     SVector{2}(a[2,2], a[3,3])
 end
 function get_unknowns(::UniaxialNormalStress, A::AbstractTensor{4, 3}) 
@@ -425,7 +430,7 @@ function get_full_tensor(state::GeneralStressState{Nσ}, ::TT, v::SVector{Nσ,T}
     return TB(f)
 end
 
-function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}) where {Nσ, T}
+function get_unknowns(state::GeneralStressState{Nσ}, a::AbstractTensor{2,3,T}, args...) where {Nσ, T}
     shear_factor = a isa SymmetricTensor ? sqrt(2 * one(T)) : one(T)
     s(i,j) = i==j ? one(T) : shear_factor
     f(c) = ((i,j) = c; s(i,j)*(a[i,j]-state.σ[i,j]))

@@ -5,8 +5,11 @@ using Tensors, StaticArrays
 import MaterialModelsBase as MMB
 using FiniteDiff: FiniteDiff
 using MaterialModelsTesting:
-    LinearElastic, ViscoElastic, NeoHooke, test_derivative, obtain_numerical_material_derivative!,
+    LinearElastic, ViscoElastic, NeoHooke,
+    test_derivative, obtain_numerical_material_derivative!,
     runstrain, runstrain_diff, runstresstate, runstresstate_diff
+
+import MechanicalMaterialModels as MechMat
 
 include("utils4testing.jl")
 

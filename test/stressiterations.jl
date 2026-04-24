@@ -194,6 +194,27 @@ end
     @test isapprox(P, fromvoigt(SymmetricTensor{4,2}, Dvoigt)⊡ϵ; rtol)
 end
 
+@testset "finite strain plasticity" begin
+    # This test causes failure without preventing rotation
+    # around x-axis in uniaxial stress
+    m = MechMat.FiniteStrainPlastic(;
+        elastic=MechMat.CompressibleNeoHooke(;G = 80.e3, K = 155e3),
+        yield=100.0,
+        isotropic=(MechMat.Voce(;Hiso=100e3, κ∞=50.0),),
+        kinematic=(MechMat.ArmstrongFrederick(;Hkin=80e3, β∞=130.0),),
+        overstress=MechMat.NortonOverstress(; tstar=0.5, nexp=2.0)
+        )
+    old = initial_material_state(m)
+    ss = UniaxialStress(; tolerance = 1e-10)
+    Δϵ = 1e-6
+    for ϵ in range(0, 0.2, 100)[2:end]
+        P, dPdF, state, Ffull = material_response(ss, m, Tensor{2,1}((1 + ϵ,)), old, 1e-3)
+        P2, _ = material_response(ss, m, Tensor{2,1}((1 + ϵ + Δϵ,)), old, 1e-3)
+        @test dPdF[1,1,1,1] ≈ (P2[1,1] - P[1,1]) / Δϵ
+        old = state
+    end
+end
+
 @testset "visco_elastic" begin
     # Test a nonlinear, state and rate dependent, material by running stress iterations.
     # Check that state variables and time dependence are handled correctly

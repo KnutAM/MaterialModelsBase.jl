@@ -1,25 +1,26 @@
 name = "MaterialModelsBase"
 uuid = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
+version = "0.3.2"
 authors = ["Knut Andreas Meyer and contributors"]
-version = "0.3.1"
 
 [deps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 
+[sources]
+MaterialModelsTesting = {url = "https://github.com/KnutAM/MaterialModelsTesting.jl"}
+MechanicalMaterialModels = {url = "https://github.com/KnutAM/MechanicalMaterialModels.jl"}
+
 [compat]
 julia = "1.11"
 
 [extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 MaterialModelsTesting = "882b014b-b96c-4115-8629-e17fb35110d2"
+MechanicalMaterialModels = "b3282f9b-607f-4337-ab95-e5488ab5652c"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-
-[sources]
-MaterialModelsTesting = {url = "https://github.com/KnutAM/MaterialModelsTesting.jl"}
-#MaterialModelsTesting = {path = "/Users/knutan/.julia/dev/MaterialModelsTesting"}
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "FiniteDiff", "MaterialModelsTesting", "Random"]
+test = ["Test", "FiniteDiff", "MaterialModelsTesting", "MechanicalMaterialModels", "Random"]

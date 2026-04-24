@@ -117,7 +117,12 @@ Uniaxial stress such that
 ``\\sigma_{ij}=0 \\forall (i,j)\\neq (1,1)``
 The strain input can be 1d (`SecondOrderTensor{1}`).
 A 3d input is also accepted and used as an initial 
-guess for the unknown strain components. 
+guess for the unknown strain components.
+
+For finite strains, the equation ``P_{32} = 0`` is replaced by
+``F_{23} - F_{32} = 0`` to avoid free spinning around the 1-axis.
+For models fulfilling the balance of angular momentum,
+``\\sigma_{ij}=\\sigma_{ji}``, ``P_{32} = 0`` is still fulfilled.
 
 The optional keyword arguments are forwarded to [`IterationSettings`](@ref).
 """

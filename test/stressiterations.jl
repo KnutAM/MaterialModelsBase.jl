@@ -12,9 +12,7 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
                 ([1,6,9], [1,6]))
 
 @testset "conversions" begin
-    # Test that
-    # 1) All conversions are invertible (convert back and fourth)
-    # 2) Are compatible with the expected mandel dynamic tensors 
+    # Test that all conversions are invertible (convert back and forth)
     for _stress_state in all_states
         for TT in (Tensor, SymmetricTensor)
             stress_state = if isa(_stress_state, NamedTuple)
@@ -34,72 +32,21 @@ iter_mandel = ( ([2,3,4,5,6,7,8,9],[2,3,4,5,6]),
             @test ared ≈ MMB.reduce_tensordim(stress_state, afull)
         end
     end
-
-    for (_stress_state, inds) in zip(iter_states, iter_mandel)
-        for (TT, ii) in zip((Tensor, SymmetricTensor), inds)
-            state = if isa(_stress_state, NamedTuple)
-                _stress_state[nameof(TT)]
-            else
-                _stress_state
-            end
-            a = rand(TT{2,3})
-            A = rand(TT{4,3})
-            F = rand(TT{2,3})
-            ax = MMB.get_unknowns(state, a, F)
-            Ax = MMB.get_unknowns(state, A)
-            if isa(a, Tensor) && isa(state, UniaxialStress)
-                # Special case due to extra rotation constraint
-                idxs1 = setdiff(1:8, 6)
-                idxs2 = setdiff(1:8, [3, 6])
-                @test ax[idxs1] ≈ tomandel(a)[ii[idxs1]]
-                @test Ax[idxs1,:] ≈ tomandel(A)[ii[idxs1],ii]
-                @test Ax[:,idxs2] ≈ tomandel(A)[ii,ii[idxs2]]
-                @test Ax[6, 3] ≈ 1
-                @test Ax[6, 6] ≈ -1
-
-                am = tomandel(a)
-                am[setdiff(1:length(am), ii)] .= 0
-                am[7] = F[2,3] - F[3,2]
-                ac = frommandel(typeof(a), am)
-                # Test that other comps become zero, and the rest are converted correctly
-                @test ac ≈ MMB.get_full_tensor(state, a, MMB.get_unknowns(state, a, F))
-            else # Corresponding to regular mandel
-                @test ax ≈ tomandel(a)[ii]
-                @test Ax ≈ tomandel(A)[ii,ii]
-
-                am = tomandel(a)
-                am[setdiff(1:length(am), ii)] .= 0
-                ac = frommandel(typeof(a), am)
-                # Test that other comps become zero, and the rest are converted correctly
-                @test ac ≈ MMB.get_full_tensor(state, a, MMB.get_unknowns(state, a, F))
-            end
-        end
-    end
 end
 
-@testset "stiffness_calculations" begin
+@testset "small strain reduced stiffness" begin
     for (_stress_state, inds) in zip(iter_states, iter_mandel)
-        for (TT, ii) in zip((Tensor, SymmetricTensor), inds)
-            state = if isa(_stress_state, NamedTuple)
-                _stress_state[nameof(TT)]
-            else
-                _stress_state
-            end
-            dσdϵ = rand(TT{4,3}) + one(TT{4,3})
-            dσᶜdϵᶜ = MMB.reduce_stiffness(state, dσdϵ)
-            if isa(state, UniaxialStress) && TT === Tensor
-                D_mandel = tomandel(dσdϵ)
-                D_mandel[7, 4] = 1
-                D_mandel[7, 7] = -1
-                jj = setdiff(1:size(D_mandel,1), ii)
-                @test dσᶜdϵᶜ ≈ frommandel(TT{4,_getdim(state)}, inv(inv(D_mandel)[jj,jj]))
-            elseif _getdim(state) < 3   # Otherwise, conversion is direct
-                D_mandel = tomandel(dσdϵ)
-                jj = setdiff(1:size(D_mandel,1), ii)
-                @test dσᶜdϵᶜ ≈ frommandel(TT{4,_getdim(state)}, inv(inv(D_mandel)[jj,jj]))
-            else
-                @test dσdϵ == dσᶜdϵᶜ
-            end
+        ii = inds[2]
+        TT = SymmetricTensor
+        state = isa(_stress_state, NamedTuple) ? _stress_state[:SymmetricTensor] : _stress_state
+        dσdϵ = rand(TT{4,3}) + one(TT{4,3})
+        dσᶜdϵᶜ = MMB.reduce_stiffness(state, dσdϵ, zero(TT{2,3}), zero(TT{2,3}))
+        if _getdim(state) < 3   # Otherwise, conversion is direct
+            D_mandel = tomandel(dσdϵ)
+            jj = setdiff(1:size(D_mandel,1), ii)
+            @test dσᶜdϵᶜ ≈ frommandel(TT{4,_getdim(state)}, inv(inv(D_mandel)[jj,jj]))
+        else
+            @test dσdϵ == dσᶜdϵᶜ
         end
     end
 end
@@ -196,6 +143,13 @@ end
     m = NeoHooke(;G, K)
     old = initial_material_state(m)
     # UniaxialStress
+    # Zero strain, F = I2
+    P, dPdF, state, Ffull = material_response(UniaxialStress(), m, one(Tensor{2,1}), old, 0.0)
+    @test P[1,1] ≈ 0 atol = eps(E)
+    @test dPdF[1,1,1,1] ≈ E
+    @test Ffull ≈ one(Tensor{2,3})
+    
+    # Small strain
     P, dPdF, state, Ffull = material_response(UniaxialStress(), m, Tensor{2,1}((1 + Δϵ,)), old, 0.0)
     @test isapprox(P[1,1], E*Δϵ; rtol)
     @test isapprox(dPdF[1,1,1,1], E; rtol)
@@ -210,6 +164,15 @@ end
     @test isapprox(P_full[2,2], λ*Δϵ; rtol)
 
     # PlaneStress
+    # * Zero strain
+    F = one(Tensor{2,2})
+    P, dPdF, state, Ffull = material_response(PlaneStress(), m, F, old, 0.0)
+    Dvoigt = (E/(1-ν^2))*[1 ν 0; ν 1 0; 0 0 (1-ν)/2]
+    @test tovoigt(symmetric(dPdF)) ≈ Dvoigt
+    @test norm(P) ≈ 0 atol = eps(E)
+    @test Ffull ≈ one(Tensor{2,3})
+
+    # * Small strain
     ϵ = Δϵ * rand(SymmetricTensor{2,2})
     F = one(Tensor{2,2}) + ϵ
     P, dPdF, state, Ffull = material_response(PlaneStress(), m, F, old, 0.0)

@@ -157,22 +157,53 @@ function reset_derivatives!(sd::StressStateDerivatives, sd_prev::StressStateDeri
     return sd
 end
 
-function differentiate_material!(ssd::StressStateDerivatives, stress_state::AbstractStressState, m::AbstractMaterial, ϵ::AbstractTensor, args::Vararg{Any,N}) where {N}
-    σ_full, dσdϵ_full, state, ϵ_full = stress_state_material_response(stress_state, m, ϵ, args...)
-    differentiate_material!(ssd.mderiv, m, ϵ_full, args..., dσdϵ_full)
-    
-    if isa(stress_state, NoIterationState)
-        copy!(ssd.dσdp, ssd.mderiv.dσdp)
-        fill!(ssd.dϵdp, 0)
-    else
-        sc = stress_controlled_indices(stress_state, ϵ)
-        ec = strain_controlled_indices(stress_state, ϵ)
-        dσᶠdϵᶠ_inv = inv(get_unknowns(stress_state, dσdϵ_full)) # f: unknown strain components solved for during stress iterations
-        ssd.dϵdp[sc, :] .= .-dσᶠdϵᶠ_inv * ssd.mderiv.dσdp[sc, :]
-        ssd.dσdp[ec, :] .= ssd.mderiv.dσdp[ec, :] .+ ssd.mderiv.dσdϵ[ec, sc] * ssd.dϵdp[sc, :]
-        ssd.mderiv.dsdp .+= ssd.mderiv.dsdϵ[:, sc] * ssd.dϵdp[sc, :]
-    end
-    return reduce_tensordim(stress_state, σ_full), reduce_stiffness(stress_state, dσdϵ_full), state, ϵ_full
+function differentiate_material!(ssd::StressStateDerivatives, stress_state::AbstractStressState, m::AbstractMaterial, strain::AbstractTensor, args::Vararg{Any,N}) where {N}
+    stress_3d, stiff_3d, state, strain_3d = stress_state_material_response(stress_state, m, strain, args...)
+    differentiate_material!(ssd.mderiv, m, strain_3d, args..., stiff_3d)
+    _update_derivatives!(ssd, stress_state, strain_3d, stress_3d, stiff_3d)
+    return reduce_tensordim(stress_state, stress_3d), reduce_stiffness(stress_state, stiff_3d, strain_3d, stress_3d), state, strain_3d
+end
+
+function _update_derivatives!(ssd::StressStateDerivatives, ::NoIterationState, args...)
+    copy!(ssd.dσdp, ssd.mderiv.dσdp)
+    fill!(ssd.dϵdp, 0)
+    return ssd
+end
+
+# IterationState
+# drdp = 0 = ∂r∂p + ∂r∂x * dxdp => dxdp = -∂r∂x\∂r∂p
+# r(x(p),P(x,p))
+# Calculated: ∂P∂p (for full strain, F) and ∂P∂x (∂P∂F)
+# r = r̃(τ(P(x(p), p), x(p)), x(p))
+# drdp = ∂r̃∂τ ⋅ [∂τ∂P ⋅ [∂P∂x ⋅ dxdp + ∂P∂p] + ∂τ∂x ⋅ dxdp] + ∂r̃∂x ⋅ dxdp
+#      = [∂r̃∂τ ⋅ [∂τ∂P ⋅ ∂P∂x + ∂τ∂x] + ∂r̃∂x] ⋅ dxdp + ∂r̃∂τ ⋅ ∂τ∂P ⋅ ∂P∂p = 0
+# dxdp = -([∂r̃∂τ ⋅ [∂τ∂P ⋅ ∂P∂x + ∂τ∂x] + ∂r̃∂x])⁻¹ ⋅ [∂r̃∂τ ⋅ ∂τ∂P ⋅ ∂P∂p]
+# r = r̂(x(p), p) = r̃(τ(P(x(p), p), x(p)), x(p))
+# ∂r̂∂x = get_drdx(...) # This is the function we already have
+# ∂r̂∂p = ∂r̃∂τ ⋅ ∂τ∂P ⋅ ∂P∂p
+# dxdp = -∂r̂∂x \ ∂r̂∂p
+# Small strains, σ = τ = P & r = τ[sc]
+#   => ∂r̂∂p = ∂r̃∂τᶠ ⋅ ∂τᶠ∂Pᶠ ⋅ ∂Pᶠ∂p = [I ⋅ I ⋅ ∂Pᶠ∂p] = ∂Pᶠ∂p = ∂σᶠ∂p
+#   => dϵdp = - ∂r̂∂x \ ∂σᶠ∂p
+# Finite strains
+# ∂r̃∂τ depends on specific gauge constraints
+# ∂τ∂P = I ⊗̄ F (τ = P F'; => P_ij F_jk' / dP_lm = δ_il δ_jm F_jk' = δ_il F_km)
+# Not yet implemented
+
+# SmallStrains
+function _update_derivatives!(ssd::StressStateDerivatives, stress_state::IterationState, ϵ::SymmetricTensor{2,3}, σ::SymmetricTensor{2,3}, dσdϵ::SymmetricTensor{4,3})
+    sc = stress_controlled_indices(stress_state, ϵ)
+    ec = strain_controlled_indices(stress_state, ϵ)
+    minus_∂r∂x_inv = -inv(get_drdx(stress_state, dσdϵ, ϵ, σ)) # -[∂σᶠ∂ϵᶠ]⁻¹
+    ssd.dϵdp[sc, :] .= minus_∂r∂x_inv * ssd.mderiv.dσdp[sc, :]
+    ssd.dσdp[ec, :] .= ssd.mderiv.dσdp[ec, :] .+ ssd.mderiv.dσdϵ[ec, sc] * ssd.dϵdp[sc, :]
+    ssd.mderiv.dsdp .+= ssd.mderiv.dsdϵ[:, sc] * ssd.dϵdp[sc, :]
+    return ssd
+end
+
+# FiniteStrains
+function _update_derivatives!(ssd::StressStateDerivatives, stress_state::IterationState, F::Tensor{2,3}, P::Tensor{2,3}, dPdF::Tensor{4,3})
+    error("StressStateDerivatives calculation for finite strains not implemented, see notes in source file for a start to implement")
 end
 
 """

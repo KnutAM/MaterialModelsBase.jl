@@ -1,6 +1,6 @@
 name = "MaterialModelsBase"
 uuid = "af893363-701d-44dc-8b1e-d9a2c129bfc9"
-version = "0.3.2"
+version = "0.4"
 authors = ["Knut Andreas Meyer and contributors"]
 
 [deps]

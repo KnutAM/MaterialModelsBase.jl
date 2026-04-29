@@ -8,14 +8,15 @@ Provide interface to "standard" history dependent mechanical (stress-strain) mat
 
 ## Main interface function
 ```julia
-material_response(
-    [stress_state::AbstractStressState]             # Optional stress state (e.g. plane stress) if full 3d is not desired. 
-    m::AbstractMaterial,                            # Describes the specific material and its parameters
-    ϵ::Union{SymmetricTensor{2}, Tensor{2}, Vec},   # ϵ (small strain tensor), F (deformation gradient), or u (displacement jump)
-    old::AbstractMaterialState,                     # The old material state
-    Δt,                                             # The time step
-    cache::AbstractMaterialCache,                   # A cache that can be used to reduce allocations inside material_response
-    extras::AbstractExtraOutput)                    # Custom struct whose entries can be mutated to provide extra information from material_response's calculations
+
+stress, stiffness, state, [full_strain] = material_response(
+    [stress_state::AbstractStressState]               # Optional stress state (e.g. plane stress) if full 3d is not desired
+    m::AbstractMaterial,                              # Describes the specific material and its parameters
+    strain::Union{SymmetricTensor{2}, Tensor{2}, Vec},# ϵ (small strain tensor), F (deformation gradient), or u (displacement jump)
+    old::AbstractMaterialState,                       # The old material state
+    Δt,                                               # The time step
+    cache::AbstractMaterialCache,                     # A cache that can be used to reduce allocations inside material_response
+    extras::AbstractExtraOutput)                      # Custom struct whose entries can be mutated to provide extra information from material_response's calculations
 ```
 
 ## Dependencies

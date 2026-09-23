@@ -104,6 +104,14 @@ given as
 AbstractExtraOutput
 ```
 
+### Postprocessing
+When postprocessing an already converged simulation, it is often useful to calculate
+the stress again without advancing any history variables.
+`stress_from_state` provides this and supports lower-dimensional stress states as well.
+```@docs
+stress_from_state
+```
+
 ### Exceptions
 Finally, the following exceptions are included
 ```@docs

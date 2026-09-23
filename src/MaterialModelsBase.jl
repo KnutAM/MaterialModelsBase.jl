@@ -22,6 +22,9 @@ export PlaneStress, UniaxialStress, UniaxialNormalStress    # Iterative stress s
 export GeneralStressState                                   # General iterative 3D non-zero stress state
 export update_stress_state!                                 # For nonzero stress-conditions
 
+# Postprocessing
+export stress_from_state                                    # Stress consistent with a frozen state
+
 # For parameter identification and differentiation of materials
 export tovector, tovector!, fromvector                      # Convert to/from `AbstractVector`s
 export get_num_tensorcomponents, get_num_statevars          # Information about the specific material
@@ -158,6 +161,7 @@ struct NoExtraOutput <: AbstractExtraOutput end
 
 include("vector_conversion.jl")
 include("stressiterations.jl")
+include("stress_from_state.jl")
 include("differentiation.jl")
 include("ErrorExceptions.jl")
 

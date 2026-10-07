@@ -27,4 +27,7 @@ deploydocs(;
     repo="github.com/KnutAM/MaterialModelsBase.jl",
     devbranch="main",
     push_preview=true,
+    # `dev` first makes it the default version that the docs root redirects to.
+    # Released versions remain available under their version numbers.
+    versions=["dev" => "dev", "v#.#"],
 )

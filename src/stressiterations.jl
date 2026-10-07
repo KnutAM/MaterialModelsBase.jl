@@ -1,7 +1,8 @@
 abstract type AbstractStressState end
 
 """
-    material_response(stress_state::AbstractStressState, m::AbstractMaterial, args...)
+    stress, stiffness, state, full_strain
+        = material_response(stress_state::AbstractStressState, m::AbstractMaterial, args...)
 
 To be able to use material models implemented for 3d stress and strain states in lower-dimensional 
 simulations, such as 2d plane stress, `MaterialModelsBase.jl` provides a set of stress states. 
